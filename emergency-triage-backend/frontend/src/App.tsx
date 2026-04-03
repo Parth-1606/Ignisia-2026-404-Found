@@ -29,12 +29,12 @@ const hospitalIcon = new L.Icon({
 });
 
 const idleAmbulanceIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/2.0.0/images/marker-shadow.png',
-  iconSize: [18, 30],
-  iconAnchor: [9, 30],
-  popupAnchor: [1, -24],
-  shadowSize: [30, 30]
+  iconSize: [20, 33],
+  iconAnchor: [10, 33],
+  popupAnchor: [1, -28],
+  shadowSize: [33, 33]
 });
 
 const activeAmbulanceIcon = new L.DivIcon({
@@ -87,13 +87,14 @@ type Hospital = {
 
 const fetchRoute = async (start: [number, number], end: [number, number]): Promise<[number, number][]> => {
   try {
-    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/\${start[1]},\${start[0]};\${end[1]},\${end[0]}?overview=full&geometries=geojson`);
+    const url = 'https://router.project-osrm.org/route/v1/driving/' + start[1] + ',' + start[0] + ';' + end[1] + ',' + end[0] + '?overview=full&geometries=geojson';
+    const res = await fetch(url);
     const data = await res.json();
     if (data.code === 'Ok') {
       return data.routes[0].geometry.coordinates.map((c: number[]) => [c[1], c[0]]);
     }
   } catch (e) {
-    console.error(e);
+    console.error('OSRM route fetch error:', e);
   }
   return [start, end];
 };
