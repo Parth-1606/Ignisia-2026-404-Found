@@ -33,6 +33,8 @@ app.use(globalLimiter);
 // ============================================================
 // HEALTH CHECK
 // ============================================================
+app.get('/', (req, res) => res.redirect('/health'));
+
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
