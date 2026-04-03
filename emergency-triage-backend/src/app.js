@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 
 const dispatchRoutes  = require('./routes/dispatch');
 const hospitalRoutes  = require('./routes/hospitals');
@@ -15,7 +16,10 @@ const app = express();
 // ============================================================
 // SECURITY & MIDDLEWARE
 // ============================================================
-app.use(helmet());
+// Disable Helmet's Content Security Policy for the frontend to work normally during Dev. Or configure appropriately.
+app.use(helmet({
+  contentSecurityPolicy: false,
+}));
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
   methods: ['GET', 'POST', 'PATCH', 'DELETE'],
@@ -28,13 +32,11 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 const globalLimiter = rateLimit({ windowMs: 60_000, max: 200, message: { success: false, error: 'Rate limit exceeded' } });
 const dispatchLimiter = rateLimit({ windowMs: 60_000, max: 60, message: { success: false, error: 'Dispatch rate limit exceeded' } });
 
-app.use(globalLimiter);
+app.use('/api', globalLimiter);
 
 // ============================================================
 // HEALTH CHECK
 // ============================================================
-app.get('/', (req, res) => res.redirect('/health'));
-
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -51,6 +53,19 @@ app.get('/health', (req, res) => {
 app.use('/api/dispatch',  dispatchLimiter, dispatchRoutes);
 app.use('/api/hospitals', hospitalRoutes);
 app.use('/api/patients',  patientRoutes);
+
+// ============================================================
+// FRONTEND INTEGRATION
+// ============================================================
+const frontendPath = path.join(__dirname, '../frontend/dist');
+app.use(express.static(frontendPath));
+
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
+    return next();
+  }
+  res.sendFile(path.join(frontendPath, 'index.html'));
+});
 
 // ============================================================
 // ERROR HANDLERS

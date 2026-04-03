@@ -1,0 +1,11 @@
+﻿C:\Users\PARTH PAWAR\OneDrive\Desktop\AI_Trainer-main\AI_Trainer-main\open_login.html
+C:\Users\PARTH PAWAR\OneDrive\Desktop\AI_Trainer-main\AI_Trainer-main\templates\calendar.html
+C:\Users\PARTH PAWAR\OneDrive\Desktop\AI_Trainer-main\AI_Trainer-main\templates\dashboard.html
+C:\Users\PARTH PAWAR\OneDrive\Desktop\AI_Trainer-main\AI_Trainer-main\templates\login.html
+C:\Users\PARTH PAWAR\OneDrive\Desktop\AI_Trainer-main\AI_Trainer-main\templates\signup.html
+C:\Users\PARTH PAWAR\OneDrive\Desktop\emergency-triage-backend\emergency-triage-backend\frontend\index.html
+C:\Users\PARTH PAWAR\OneDrive\Desktop\emergency-triage-backend\emergency-triage-backend\frontend\dist\index.html
+C:\Users\PARTH PAWAR\OneDrive\Desktop\emergency-triage-backend\emergency-triage-backend\frontend\node_modules\tslib\tslib.es6.html
+C:\Users\PARTH PAWAR\OneDrive\Desktop\emergency-triage-backend\emergency-triage-backend\frontend\node_modules\tslib\tslib.html
+C:\Users\PARTH PAWAR\OneDrive\Desktop\emergency-triage-backend\emergency-triage-backend\node_modules\tslib\tslib.es6.html
+C:\Users\PARTH PAWAR\OneDrive\Desktop\emergency-triage-backend\emergency-triage-backend\node_modules\tslib\tslib.html

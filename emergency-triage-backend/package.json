@@ -5,24 +5,29 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\" \"npm run dev:dispatch\"",
+    "dev:server": "nodemon src/server.js",
+    "dev:client": "cd frontend && npm run dev",
+    "dev:dispatch": "cd dispatch-dashboard && npm run dev -- --port 5174",
+    "build": "cd frontend && npm install && npm run build && cd ../dispatch-dashboard && npm install && npm run build",
     "seed": "node src/db/seed.js",
     "migrate": "node src/db/migrate.js"
   },
   "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "joi": "^17.11.0",
+    "morgan": "^1.10.0",
     "pg": "^8.11.3",
     "redis": "^4.6.10",
-    "dotenv": "^16.3.1",
-    "cors": "^2.8.5",
-    "helmet": "^7.1.0",
-    "express-rate-limit": "^7.1.5",
-    "ws": "^8.14.2",
     "uuid": "^9.0.0",
-    "morgan": "^1.10.0",
-    "joi": "^17.11.0"
+    "ws": "^8.14.2"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "nodemon": "^3.0.2"
   }
 }
