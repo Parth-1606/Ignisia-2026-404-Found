@@ -28,13 +28,22 @@ const hospitalIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-const ambulanceIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/2.0.0/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
+const getAmbulanceIcon = (isSelected: boolean, isIdle: boolean = false) => new L.DivIcon({
+  className: 'bg-transparent border-none',
+  html: isIdle ? `
+    <div style="font-size: 18px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); transform: translate(-5px, -5px);">🚑</div>
+  ` : `
+    <div style="position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; transform: translate(-10px, -10px);">
+      <div class="absolute bg-purple-600/30 rounded-full animate-ping" style="width: 50px; height: 50px; animation-duration: 2s;"></div>
+      <div class="absolute bg-purple-500/20 rounded-full" style="width: 40px; height: 40px;"></div>
+      <div class="relative z-10 bg-white rounded-lg p-1 shadow-md border border-purple-200 text-lg flex items-center justify-center leading-none" style="width: 28px; height: 28px;">
+        🚑
+      </div>
+    </div>
+  `,
+  iconSize: isIdle ? [20, 20] : [40, 40],
+  iconAnchor: isIdle ? [10, 10] : [20, 20],
+  popupAnchor: [0, -20],
 });
 
 const incidentIcon = new L.Icon({
@@ -71,10 +80,30 @@ type Hospital = {
   load: number; // 0-100%
 };
 
+const fetchRoute = async (start: [number, number], end: [number, number]): Promise<[number, number][]> => {
+  try {
+    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/\${start[1]},\${start[0]};\${end[1]},\${end[0]}?overview=full&geometries=geojson`);
+    const data = await res.json();
+    if (data.code === 'Ok') {
+      return data.routes[0].geometry.coordinates.map((c: number[]) => [c[1], c[0]]);
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return [start, end];
+};
+
 type Patient = {
   id: string;
   lat: number;
   lng: number;
+  ambulanceLat: number;
+  ambulanceLng: number;
+  dispatchedUnit: string;
+  routeToPatient: [number, number][];
+  routeToHospital: [number, number][];
+  currentRoutePhase: 'TO_PATIENT' | 'TO_HOSPITAL' | 'ARRIVED';
+  currentRouteIndex: number;
   vitals: { hr: number; bp: string; spo2: number; gcs: number };
   symptoms: string;
   predictedNeeds: string[];
@@ -87,6 +116,14 @@ type Patient = {
 // Initial state starts empty
 const INITIAL_HOSPITALS: Hospital[] = [];
 const INITIAL_PATIENTS: Patient[] = [];
+
+const generateAmbulances = (centerLat: number, centerLng: number) => {
+  return Array.from({length: 6}).map((_, i) => ({
+    id: 'AMB-' + (100 + i),
+    lat: centerLat + (Math.random() - 0.5) * 0.08,
+    lng: centerLng + (Math.random() - 0.5) * 0.08,
+  }));
+};
 
 // Helper to map backend format
 const mapHospital = (h: any): Hospital => ({
@@ -133,6 +170,11 @@ export default function App() {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [liveUpdates, setLiveUpdates] = useState<{id: string; text: string; time: string; type: 'up' | 'down'}[]>([]);
+  const [availableAmbulances, setAvailableAmbulances] = useState<{id: string; lat: number; lng: number}[]>([]);
+
+  useEffect(() => {
+     setAvailableAmbulances(generateAmbulances(18.5204, 73.8567));
+  }, []);
 
   useEffect(() => {
     const fetchHospitals = async () => {
@@ -206,6 +248,79 @@ export default function App() {
       ws?.close();
     };
   }, []);
+
+  // Animation Engine for Ambulances
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setPatients(prev => {
+        let changed = false;
+        const next = prev.map(p => {
+          if (p.currentRoutePhase === 'ARRIVED') return p;
+          changed = true;
+          
+          const SPEED = 0.0003; // Distance to move per 100ms tick (~30 meters)
+          const targetRoute = p.currentRoutePhase === 'TO_PATIENT' ? p.routeToPatient : p.routeToHospital;
+          
+          let curLat = p.ambulanceLat;
+          let curLng = p.ambulanceLng;
+          let currentIndex = p.currentRouteIndex;
+          
+          if (!targetRoute || targetRoute.length === 0) {
+            return { ...p, currentRoutePhase: 'ARRIVED' as const };
+          }
+
+          // Follow the path coordinates array
+          while (currentIndex < targetRoute.length) {
+            const nextP = targetRoute[currentIndex];
+            const dLat = nextP[0] - curLat;
+            const dLng = nextP[1] - curLng;
+            const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+            
+            if (dist > SPEED) {
+              curLat += (dLat / dist) * SPEED;
+              curLng += (dLng / dist) * SPEED;
+              break; // Moved slightly towards next node
+            } else {
+              // Overshot the node, snap to it and target the next node on next loop
+              curLat = nextP[0];
+              curLng = nextP[1];
+              currentIndex++;
+            }
+          }
+
+          if (currentIndex >= targetRoute.length) {
+            // End of route reached
+            if (p.currentRoutePhase === 'TO_PATIENT') {
+              return {
+                ...p,
+                ambulanceLat: p.lat,
+                ambulanceLng: p.lng,
+                currentRoutePhase: (p.assignedHospitalId ? 'TO_HOSPITAL' : 'ARRIVED') as 'TO_PATIENT' | 'TO_HOSPITAL' | 'ARRIVED',
+                currentRouteIndex: 0
+              };
+            } else {
+              const targetHospital = hospitals.find(h => h.id === p.assignedHospitalId);
+              return {
+                ...p,
+                ambulanceLat: targetHospital?.lat || p.lat,
+                ambulanceLng: targetHospital?.lng || p.lng,
+                currentRoutePhase: 'ARRIVED' as const
+              };
+            }
+          }
+
+          return {
+             ...p,
+             ambulanceLat: curLat,
+             ambulanceLng: curLng,
+             currentRouteIndex: currentIndex
+          };
+        });
+        return changed ? next : prev;
+      });
+    }, 100);
+    return () => clearInterval(timer);
+  }, [hospitals]);
   
   // Form State
   const [newPatient, setNewPatient] = useState({
@@ -333,10 +448,42 @@ export default function App() {
         if (rawSeverity.toLowerCase() === 'critical') severityClass = 'Critical';
         if (rawSeverity.toLowerCase() === 'urgent' || rawSeverity.toLowerCase() === 'high') severityClass = 'Urgent';
 
+        // Find nearest available ambulance
+        let nearestAmb = availableAmbulances.length > 0 ? availableAmbulances[0] : null;
+        let minDist = Infinity;
+        availableAmbulances.forEach(a => {
+          const d = Math.sqrt(Math.pow(a.lat - newPatient.lat, 2) + Math.pow(a.lng - newPatient.lng, 2));
+          if (d < minDist) {
+            minDist = d;
+            nearestAmb = a;
+          }
+        });
+
+        const ambLat = nearestAmb ? nearestAmb.lat : newPatient.lat + (Math.random() - 0.5) * 0.05;
+        const ambLng = nearestAmb ? nearestAmb.lng : newPatient.lng + (Math.random() - 0.5) * 0.05;
+
+        // Fetch Google Maps style route coords
+        const routeToPatient = await fetchRoute([ambLat, ambLng], [newPatient.lat, newPatient.lng]);
+        const routeToHospital = bestHospital 
+          ? await fetchRoute([newPatient.lat, newPatient.lng], [bestHospital.lat, bestHospital.lng]) 
+          : [];
+
+        // Remove the dispatched ambulance from available pool
+        if (nearestAmb) {
+          setAvailableAmbulances(prev => prev.filter(a => a.id !== nearestAmb.id));
+        }
+
         const newPatientRecord: Patient = {
           id: data.data.incidentId || payload.incident_id,
           lat: newPatient.lat,
           lng: newPatient.lng,
+          ambulanceLat: ambLat,
+          ambulanceLng: ambLng,
+          dispatchedUnit: nearestAmb ? nearestAmb.id : 'AMB-Auto',
+          routeToPatient,
+          routeToHospital,
+          currentRoutePhase: 'TO_PATIENT',
+          currentRouteIndex: 0,
           vitals: { hr: newPatient.hr, bp: newPatient.bp, spo2: newPatient.spo2, gcs: newPatient.gcs },
           symptoms: newPatient.symptoms,
           predictedNeeds: [
@@ -536,8 +683,8 @@ export default function App() {
                           {p.severity}
                         </Badge>
                       </div>
-                      <div className="text-xs text-gray-600 line-clamp-2 mb-2">{p.symptoms}</div>
-                      <div className="text-xs font-semibold text-blue-700 flex items-center gap-1 bg-white/50 p-1.5 rounded border border-blue-100">
+                      <div className="text-xs text-gray-600 line-clamp-2 mb-3">{p.symptoms}</div>
+                      <div className="text-[11px] font-semibold text-blue-700 flex items-center gap-1.5 bg-blue-50/50 p-2 rounded-md border border-blue-200 shadow-sm">
                         <Navigation className="h-3 w-3 shrink-0" />
                         <span className="truncate">To: {hospitals.find(h => h.id === p.assignedHospitalId)?.name || 'Pending'}</span>
                       </div>
@@ -546,6 +693,40 @@ export default function App() {
                 </AnimatePresence>
               </div>
             </div>
+
+            {/* Available Ambulances Nearby */}
+            <div className="mt-8 border-t pt-5">
+              <h3 className="font-semibold text-xs text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <Car className="h-4 w-4" />
+                Available Units Nearby
+              </h3>
+              <div className="space-y-2">
+                {availableAmbulances.slice().sort((a, b) => {
+                  const distA = Math.sqrt(Math.pow(a.lat - newPatient.lat, 2) + Math.pow(a.lng - newPatient.lng, 2));
+                  const distB = Math.sqrt(Math.pow(b.lat - newPatient.lat, 2) + Math.pow(b.lng - newPatient.lng, 2));
+                  return distA - distB;
+                }).map(a => {
+                  const dist = Math.sqrt(Math.pow(a.lat - newPatient.lat, 2) + Math.pow(a.lng - newPatient.lng, 2));
+                  const eta = Math.max(1, Math.round(dist * 111 * 1.5)); // rough simulation
+                  return (
+                    <div key={a.id} className="bg-white border border-gray-200 rounded-xl p-3 flex justify-between items-center hover:bg-slate-50 transition-colors shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-emerald-50 border border-emerald-100 text-emerald-700 p-1.5 rounded-lg shadow-sm text-base">🚑</div>
+                        <div>
+                          <div className="font-bold text-sm text-slate-800">{a.id}</div>
+                          <div className="text-[11px] text-slate-500 font-medium">{eta} min away</div>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-200 bg-emerald-50 font-semibold shadow-sm">Available</Badge>
+                    </div>
+                  );
+                })}
+                {availableAmbulances.length === 0 && (
+                  <div className="p-3 text-center text-xs text-slate-400 border border-dashed rounded-lg">No idle units available.</div>
+                )}
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -599,25 +780,59 @@ export default function App() {
               </Marker>
             ))}
 
+            {/* Available Ambulances */}
+            {availableAmbulances.map(a => (
+              <Marker key={a.id} position={[a.lat, a.lng]} icon={getAmbulanceIcon(false, true)} zIndexOffset={500}>
+                <Popup>
+                  <div className="font-bold">{a.id}</div>
+                  <div className="text-xs">Idle / Available Unit</div>
+                </Popup>
+              </Marker>
+            ))}
+
             {/* Patient Markers & Routes */}
             {patients.map(p => {
               const targetHospital = hospitals.find(h => h.id === p.assignedHospitalId);
               const isSelected = p.id === selectedPatientId;
               return (
                 <React.Fragment key={p.id}>
-                  <Marker position={[p.lat, p.lng]} icon={ambulanceIcon} zIndexOffset={isSelected ? 1000 : 0}>
+                  {/* Mark the incident location where patient is waiting */}
+                  <Marker position={[p.lat, p.lng]} icon={incidentIcon} opacity={0.6}>
+                    <Popup>
+                      <div className="font-bold">Incident {p.id}</div>
+                      <div className="text-xs">Waiting for Unit</div>
+                    </Popup>
+                  </Marker>
+                  
+                  {/* The actual moving Ambulance */}
+                  <Marker position={[p.ambulanceLat, p.ambulanceLng]} icon={getAmbulanceIcon(isSelected)} zIndexOffset={isSelected ? 1000 : 0}>
                     <Popup>
                       <div className="font-bold">Unit {p.id}</div>
                       <div className="text-xs">{p.severity}</div>
                     </Popup>
                   </Marker>
-                  {targetHospital && (
+                  
+                  {/* Route from Ambulance to Patient */}
+                  {p.currentRoutePhase === 'TO_PATIENT' && p.routeToPatient.length > 0 && (
                     <Polyline 
-                      positions={[[p.lat, p.lng], [targetHospital.lat, targetHospital.lng]]} 
-                      color={isSelected ? "#2563eb" : "#94a3b8"}
-                      weight={isSelected ? 5 : 3}
-                      dashArray={isSelected ? "8, 12" : undefined}
-                      className={isSelected ? "animate-pulse" : ""}
+                      positions={p.routeToPatient} 
+                      color="#3b82f6" // Bright Blue like Google Maps
+                      weight={5}
+                      opacity={0.8}
+                      dashArray="10 15"
+                      className="animate-flow drop-shadow-md"
+                    />
+                  )}
+
+                  {/* Route from Patient to Hospital */}
+                  {(p.currentRoutePhase === 'TO_PATIENT' || p.currentRoutePhase === 'TO_HOSPITAL') && targetHospital && p.routeToHospital.length > 0 && (
+                    <Polyline 
+                      positions={p.routeToHospital} 
+                      color="#8b5cf6" 
+                      weight={5}
+                      opacity={0.6}
+                      dashArray="10 15"
+                      className="animate-flow drop-shadow-md"
                     />
                   )}
                 </React.Fragment>
@@ -666,6 +881,42 @@ export default function App() {
                             {need}
                           </Badge>
                         ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Dispatched Unit ETA to Scene */}
+                  <Card className="border-indigo-200 shadow-md overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
+                    <CardHeader className="pb-3 bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-indigo-100">
+                      <CardTitle className="text-sm flex items-center gap-2 text-indigo-900">
+                        <Car className="h-5 w-5 text-indigo-600" />
+                        Dispatched Rescue Unit
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4 space-y-4">
+                      <div className="flex justify-between items-start bg-white p-3 rounded-lg border border-indigo-100 shadow-sm relative overflow-hidden">
+                        <div className="flex items-center gap-4 relative z-10 w-full">
+                          <div className="text-4xl relative">
+                            🚑
+                            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-xs font-semibold text-slate-500 uppercase tracking-widest">{selectedPatient.dispatchedUnit}</div>
+                            <div className="font-bold text-lg text-slate-800 line-clamp-1 flex items-center gap-1">
+                              ALS Responder
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-2xl font-black text-indigo-600 flex items-center justify-end">
+                              {Math.max(1, Math.round(Math.sqrt(Math.pow(selectedPatient.lat - selectedPatient.ambulanceLat, 2) + Math.pow(selectedPatient.lng - selectedPatient.ambulanceLng, 2)) * 111 * 1.5))}
+                              <span className="text-sm ml-1 text-slate-500 mt-1">min</span>
+                            </div>
+                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">ETA to Scene</div>
+                          </div>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

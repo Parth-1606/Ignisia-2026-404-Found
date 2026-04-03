@@ -1,1 +1,23 @@
 @import "tailwindcss";
+
+@keyframes ticker {
+  0% { transform: translateX(50vw); }
+  100% { transform: translateX(-100%); }
+}
+
+.animate-ticker {
+  display: inline-flex;
+  animation: ticker 20s linear infinite;
+  will-change: transform;
+}
+
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.animate-flow {
+  stroke-dasharray: 10 15 !important;
+  animation: dash-flow 0.5s linear infinite !important;
+}
