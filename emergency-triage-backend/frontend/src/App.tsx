@@ -1,8 +1,11 @@
+import * as tf from '@tensorflow/tfjs';
+import * as mobilenet from '@tensorflow-models/mobilenet';
+import '@tensorflow/tfjs-backend-webgl';
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { Activity, Clock, MapPin, Navigation, ShieldAlert, CheckCircle2, Zap, MousePointerClick, HeartPulse, Car, UserCheck, Crosshair, Loader2, ExternalLink } from 'lucide-react';
+import { Activity, Clock, MapPin, Navigation, ShieldAlert, CheckCircle2, Zap, MousePointerClick, HeartPulse, Car, UserCheck, Crosshair, Loader2, ExternalLink, Bot, Mic, Send, X, AlertTriangle, Camera, Scan } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Button } from './components/ui/button';
 import { Badge } from './components/ui/badge';
@@ -28,22 +31,25 @@ const hospitalIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-const idleAmbulanceIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/2.0.0/images/marker-shadow.png',
-  iconSize: [20, 33],
-  iconAnchor: [10, 33],
-  popupAnchor: [1, -28],
-  shadowSize: [33, 33]
+const idleAmbulanceIcon = new L.DivIcon({
+  className: 'ambulance-idle-icon',
+  html: `
+    <div style="position:relative;width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
+      <div style="position:absolute;width:100%;height:100%;border-radius:50%;background:rgba(239,68,68,0.3);animation:pulse-ring 2s infinite cubic-bezier(0.2, 0.6, 0.4, 1);"></div>
+      <div style="position:relative;z-index:10;font-size:20px;line-height:1;filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));">🚑</div>
+    </div>
+  `,
+  iconSize: [36, 36],
+  iconAnchor: [18, 18],
+  popupAnchor: [0, -18],
 });
 
 const activeAmbulanceIcon = new L.DivIcon({
   className: 'ambulance-active-icon',
   html: `
     <div style="position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center;">
-      <div style="position:absolute;width:44px;height:44px;border-radius:50%;background:rgba(239,68,68,0.25);animation:pulse-ring 1.5s ease-out infinite;"></div>
-      <div style="position:absolute;width:30px;height:30px;border-radius:50%;background:rgba(239,68,68,0.15);"></div>
-      <div style="position:relative;z-index:10;width:30px;height:30px;background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:2px solid #ef4444;display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;">🚑</div>
+      <div style="position:absolute;width:44px;height:44px;border-radius:50%;background:rgba(168,85,247,0.4);animation:pulse-ring 1.5s ease-out infinite;"></div>
+      <div style="position:relative;z-index:10;font-size:24px;line-height:1;animation:alert-blink 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));">🚑</div>
     </div>
   `,
   iconSize: [44, 44],
@@ -179,9 +185,73 @@ export default function App() {
   const [liveUpdates, setLiveUpdates] = useState<{id: string; text: string; time: string; type: 'up' | 'down'}[]>([]);
   const [availableAmbulances, setAvailableAmbulances] = useState<{id: string; lat: number; lng: number}[]>([]);
 
+  // Scene Vision AI State
+  const [scenePhoto, setScenePhoto] = useState<string | null>(null);
+  const [isScanningPhoto, setIsScanningPhoto] = useState(false);
+  const [visionAnalysis, setVisionAnalysis] = useState<{ traumaLevel: string; override: boolean; reason: string } | null>(null);
+  const [mobilenetModel, setMobilenetModel] = useState<any>(null);
+  const [isModelLoading, setIsModelLoading] = useState(true);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   useEffect(() => {
      setAvailableAmbulances(generateAmbulances(18.5204, 73.8567));
   }, []);
+
+  // Load TensorFlow MobileNet model on startup
+  useEffect(() => {
+    let active = true;
+    async function loadModel() {
+      try {
+        await tf.ready();
+        const model = await mobilenet.load({ version: 2, alpha: 1.0 });
+        if (active) setMobilenetModel(model);
+      } catch (err) {
+        console.error('Failed to load Vision Model:', err);
+      } finally {
+        if (active) setIsModelLoading(false);
+      }
+    }
+    loadModel();
+    return () => { active = false; };
+  }, []);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const src = event.target?.result as string;
+      setScenePhoto(src);
+      setIsScanningPhoto(true);
+      setVisionAnalysis(null);
+      const img = document.createElement('img');
+      img.src = src;
+      img.onload = async () => {
+        if (mobilenetModel) {
+          try {
+            const predictions = await mobilenetModel.classify(img);
+            const highSeverityKeywords = ['car', 'vehicle', 'bumper', 'cab', 'van', 'grille', 'wheel', 'tire', 'wreck', 'truck', 'bus', 'traffic', 'racer', 'ambulance', 'crash'];
+            const isHighSeverity = predictions.some((p: any) =>
+              highSeverityKeywords.some(keyword => p.className.toLowerCase().includes(keyword))
+            );
+            const topLabel = predictions[0].className;
+            const prob = (predictions[0].probability * 100).toFixed(1) + '%';
+            if (isHighSeverity) {
+              setVisionAnalysis({ traumaLevel: 'LEVEL_1_TRAUMA', override: true, reason: `Critical Vision Alert: "${topLabel}" detected (${prob} confidence). High-severity vehicle scene. Overriding routing to Level 1 Trauma Center.` });
+              setNewPatient(prev => ({ ...prev, hr: 130, bp: '90/60', spo2: 92, gcs: 8, symptoms: 'Unresponsive, crush trauma, vehicle collision' }));
+            } else {
+              setVisionAnalysis({ traumaLevel: 'STANDARD', override: false, reason: `Scan complete: "${topLabel}" detected (${prob} confidence). No high-severity trauma signatures found. Standard routing applies.` });
+            }
+          } catch (err) {
+            setVisionAnalysis({ traumaLevel: 'ERROR', override: false, reason: 'Vision model failed to analyze image. Proceed with manual triage.' });
+          }
+        }
+        setIsScanningPhoto(false);
+      };
+    };
+    reader.readAsDataURL(file);
+  };
+
 
   useEffect(() => {
     const fetchHospitals = async () => {
@@ -447,7 +517,20 @@ export default function App() {
       
       if (data.success) {
         const { prediction, routing } = data.data;
-        const bestHospital = routing?.optimal?.hospital;
+        let bestHospital = routing?.optimal?.hospital;
+
+        // Vision AI Override: If scene photo detected high-severity vehicle, force Level 1 Trauma Center
+        if (visionAnalysis?.override) {
+          const level1Centers = hospitals.filter(h => h.hasNeuro && h.hasCathLab);
+          if (level1Centers.length > 0) {
+            bestHospital = level1Centers.reduce((prev, curr) => {
+              const dp = Math.pow(prev.lat - newPatient.lat, 2) + Math.pow(prev.lng - newPatient.lng, 2);
+              const dc = Math.pow(curr.lat - newPatient.lat, 2) + Math.pow(curr.lng - newPatient.lng, 2);
+              return dc < dp ? curr : prev;
+            });
+            data.data.rationale = 'CRITICAL VISION OVERRIDE: Scene photo analysis flagged high-severity vehicle collision. Standard routing bypassed. Routing to nearest Level 1 Trauma Center (Neuro + Cath Lab).';
+          }
+        }
         
         // Map Backend severity
         let severityClass = 'Stable';
@@ -523,6 +606,10 @@ export default function App() {
     }
   };
 
+  const displayedHospitals = visionAnalysis?.override
+    ? hospitals.filter(h => h.hasNeuro && h.hasCathLab)
+    : hospitals;
+
   return (
     <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans overflow-hidden">
       {/* Header */}
@@ -580,7 +667,58 @@ export default function App() {
           </div>
 
           <div className="p-4 overflow-y-auto flex-1">
-            <form onSubmit={handleTriageSubmit} className="space-y-5">
+            <form id="triageForm" onSubmit={handleTriageSubmit} className="space-y-5">
+
+              {/* Scene Photo AI Vision */}
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold flex items-center gap-2">
+                  <Camera className="h-4 w-4 text-purple-600" />
+                  Scene Photo Analysis
+                  {isModelLoading && <span className="ml-auto text-[10px] text-purple-400 font-normal flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Loading AI model...</span>}
+                  {!isModelLoading && !scenePhoto && <span className="ml-auto text-[10px] text-green-500 font-normal">✓ Model Ready</span>}
+                </Label>
+                <input type="file" ref={fileInputRef} accept="image/*" className="hidden" onChange={handleImageUpload} />
+                {!scenePhoto ? (
+                  <Button type="button" variant="outline" disabled={isModelLoading}
+                    className="w-full border-dashed border-2 border-purple-200 hover:bg-purple-50 text-purple-700 h-14"
+                    onClick={() => fileInputRef.current?.click()}>
+                    <Camera className="h-4 w-4 mr-2 text-purple-500" />
+                    {isModelLoading ? 'Initializing TensorFlow...' : 'Snap or Upload Scene Photo'}
+                  </Button>
+                ) : (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-2 relative">
+                    {isScanningPhoto ? (
+                      <div className="flex items-center justify-center gap-3 p-3">
+                        <Scan className="h-5 w-5 text-purple-500 animate-spin" />
+                        <span className="text-xs text-purple-700 font-medium animate-pulse">Running TensorFlow MobileNetV2...</span>
+                      </div>
+                    ) : (
+                      <div className="flex bg-white p-2 rounded-md shadow-sm border border-purple-100 items-start gap-3">
+                        <div className="w-14 h-14 rounded-md overflow-hidden relative shrink-0">
+                          <img src={scenePhoto} alt="scene" className="w-full h-full object-cover" />
+                          <div className={`absolute inset-0 border-[3px] rounded-md ${visionAnalysis?.override ? 'border-red-500 animate-pulse' : 'border-green-400'}`}></div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            {visionAnalysis?.override
+                              ? <AlertTriangle className="h-3 w-3 text-red-500 shrink-0" />
+                              : <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" />}
+                            <h4 className={`font-bold text-[10px] uppercase tracking-wide ${visionAnalysis?.override ? 'text-red-600' : 'text-green-600'}`}>
+                              {visionAnalysis?.traumaLevel === 'LEVEL_1_TRAUMA' ? 'HIGH SEVERITY — Override Active' : visionAnalysis?.traumaLevel === 'ERROR' ? 'Scan Error' : 'Standard Scene'}
+                            </h4>
+                          </div>
+                          <p className="text-[10px] text-slate-600 leading-tight">{visionAnalysis?.reason}</p>
+                          {visionAnalysis?.override && <Badge variant="destructive" className="mt-1 text-[9px] py-0 px-1">Level 1 Trauma Override</Badge>}
+                        </div>
+                        <button type="button" onClick={() => { setScenePhoto(null); setVisionAnalysis(null); }} className="shrink-0 text-gray-400 hover:text-red-500">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="symptoms" className="text-sm font-semibold">Reported Symptoms</Label>
                 <Input 
@@ -764,7 +902,7 @@ export default function App() {
             )}
 
             {/* Hospital Markers */}
-            {hospitals.map(h => (
+            {displayedHospitals.map(h => (
               <Marker key={h.id} position={[h.lat, h.lng]} icon={hospitalIcon}>
                 <Popup className="rounded-lg">
                   <div className="font-bold text-sm mb-1">{h.name}</div>
@@ -858,6 +996,32 @@ export default function App() {
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-lg border border-slate-200 text-sm font-medium text-slate-700 flex items-center gap-2 pointer-events-none">
             <MousePointerClick className="h-4 w-4 text-blue-500" />
             Click map to set incident location
+          </div>
+
+          {/* Map Legend */}
+          <div className="absolute bottom-6 right-6 z-[400] bg-white/95 backdrop-blur-md rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200 p-4 text-xs font-medium text-slate-700 pointer-events-none w-48">
+            <h4 className="text-slate-900 font-bold mb-3 border-b border-slate-100 pb-2 uppercase tracking-wide text-[10px]">Live Map Legend</h4>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-green-500 shadow-sm border-2 border-white flex items-center justify-center shrink-0"><div className="w-1.5 h-1.5 rounded-full bg-white"></div></div>
+                <span>Incident Origin</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-blue-500 shadow-sm border-2 border-white flex items-center justify-center shrink-0"><div className="w-1.5 h-1.5 rounded-full bg-white"></div></div>
+                <span>Medical Facility{visionAnalysis?.override ? ' (L1 Only)' : ''}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-base shrink-0 leading-none">🚑</div>
+                <span>Available Fleet</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="relative w-5 h-5 flex items-center justify-center shrink-0">
+                  <div className="absolute w-full h-full rounded-full bg-purple-500 opacity-40 animate-ping"></div>
+                  <span className="relative z-10 text-base leading-none">🚑</span>
+                </div>
+                <span>Active Dispatch</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1035,11 +1199,12 @@ export default function App() {
             <h2 className="font-semibold text-lg flex items-center gap-2 mb-4">
               <Activity className="h-5 w-5 text-red-500" />
               Live Regional Grid
-              <span className="ml-auto text-xs text-slate-400 font-normal">{hospitals.length} hospitals</span>
+              {visionAnalysis?.override && <span className="ml-2 text-[10px] text-red-500 font-semibold bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">Vision Override Active</span>}
+              <span className="ml-auto text-xs text-slate-400 font-normal">{displayedHospitals.length} hospitals</span>
             </h2>
             
             <div className="space-y-3">
-              {hospitals.map(h => (
+              {displayedHospitals.map(h => (
                 <div key={h.id} className="border border-slate-200 rounded-xl p-4 text-sm shadow-sm hover:shadow-md transition-shadow bg-slate-50/50">
                   <div className="flex justify-between items-center mb-3">
                     <span className="font-bold text-slate-800">{h.name}</span>

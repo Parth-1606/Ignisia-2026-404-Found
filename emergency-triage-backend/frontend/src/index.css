@@ -32,7 +32,19 @@
   border: none !important;
 }
 
+.ambulance-idle-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
 .leaflet-div-icon {
   background: transparent !important;
   border: none !important;
 }
+
+@keyframes alert-blink {
+  0% { opacity: 1; }
+  50% { opacity: 0.1; }
+  100% { opacity: 1; }
+}
+.leaflet-marker-icon, .leaflet-marker-shadow { border: none !important; outline: none !important; outline-width: 0 !important; box-shadow: none !important; }

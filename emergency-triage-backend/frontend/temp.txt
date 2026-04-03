@@ -1,0 +1,327 @@
+{
+  "success": true,
+  "message": "Patient dispatched successfully",
+  "data": {
+    "success": true,
+    "patientId": "771d626c-b2ee-4026-8ceb-0c0cc6c6356f",
+    "incidentId": "INC-123",
+    "dispatchId": "778c2e73-6ae8-42bd-a44d-3ab752595249",
+    "prediction": {
+      "news2Score": 0,
+      "severityLevel": "low",
+      "severityRationale": "NEWS2 score 0–2 — routine assessment",
+      "predictedCareNeeds": {
+        "icu": false,
+        "ventilator": false,
+        "specialist": null,
+        "specialistUrgency": "routine",
+        "equipment": [],
+        "flags": []
+      },
+      "vitalBreakdown": [
+        {
+          "vital": "Respiratory Rate",
+          "value": "16 breaths/min",
+          "score": 0,
+          "flag": "normal"
+        },
+        {
+          "vital": "SpO2",
+          "value": "98%",
+          "score": 0,
+          "flag": "normal"
+        },
+        {
+          "vital": "Systolic BP",
+          "value": "120 mmHg",
+          "score": 0,
+          "flag": "normal"
+        },
+        {
+          "vital": "Heart Rate",
+          "value": "80 bpm",
+          "score": 0,
+          "flag": "normal"
+        },
+        {
+          "vital": "Temperature",
+          "value": "37°C",
+          "score": 0,
+          "flag": "normal"
+        },
+        {
+          "vital": "GCS Score",
+          "value": "15/15",
+          "score": 0,
+          "flag": "normal"
+        }
+      ],
+      "ageModifier": null
+    },
+    "routing": {
+      "success": true,
+      "optimal": {
+        "hospital": {
+          "id": "a37e651e-cb10-4930-bc72-ff0d02223f3c",
+          "name": "Deenanath Mangeshkar Hospital",
+          "address": "Erandwane, Near Mhatre Bridge, Pune 411004 (Zone 3 - Warje-Karvenagar)",
+          "latitude": "18.5050000",
+          "longitude": "73.8340000",
+          "trauma_level": 1,
+          "phone": null,
+          "total_beds": 812,
+          "icu_beds_total": 80,
+          "icu_beds_available": 10,
+          "ventilators_total": 48,
+          "ventilators_available": 3,
+          "has_cath_lab": true,
+          "has_mri": true,
+          "has_ct_scanner": true,
+          "has_burn_unit": true,
+          "has_stroke_center": true,
+          "has_trauma_bay": true,
+          "is_active": true,
+          "is_on_diversion": false,
+          "current_load_percent": 74,
+          "created_at": "2026-04-03T10:38:12.201Z",
+          "updated_at": "2026-04-03T22:04:09.732Z",
+          "specialists": [
+            {
+              "id": "53aeb751-0201-485e-a6d0-419a6e65c925",
+              "name": "Dr. Nitin Kelkar",
+              "specialty": "cardiologist",
+              "is_on_duty": true,
+              "on_call": false
+            },
+            {
+              "id": "22a62302-5856-4829-b607-f7217dbede7b",
+              "name": "Dr. Sunita Gokhale",
+              "specialty": "neurosurgeon",
+              "is_on_duty": true,
+              "on_call": false
+            },
+            {
+              "id": "c80f3b31-6c8e-4258-907e-e9c8eff68c6a",
+              "name": "Dr. Arun Kale",
+              "specialty": "trauma_surgeon",
+              "is_on_duty": false,
+              "on_call": true
+            },
+            {
+              "id": "33e18a86-5457-4fbc-ae34-544f3db6638c",
+              "name": "Dr. Dipti Wagh",
+              "specialty": "burn_specialist",
+              "is_on_duty": true,
+              "on_call": false
+            }
+          ]
+        },
+        "totalScore": 91,
+        "transitMinutes": 4,
+        "transitRoute": null,
+        "breakdown": {
+          "care": 35,
+          "beds": 20,
+          "load": 6,
+          "specialist": 20,
+          "transit": 10
+        },
+        "reasons": {
+          "care": [
+            "✓ Level 1 Trauma Center (highest capability)"
+          ],
+          "beds": [
+            "General capacity: 26% available"
+          ],
+          "load": [
+            "High load: 74% capacity"
+          ],
+          "specialist": [
+            "No specialist required for this case"
+          ],
+          "transit": [
+            "Excellent: 4 min away"
+          ]
+        },
+        "mcePenalty": 0
+      },
+      "rationale": "ROUTING DECISION: Deenanath Mangeshkar Hospital\nOVERALL SCORE: 91/100\n\nWHY THIS HOSPITAL WAS CHOSEN:\n  • Hospital load: 74%\n  • Estimated arrival: 4 minutes\n  • Trauma Level: 1\n\nALTERNATIVES CONSIDERED:\n  • Ruby Hall Clinic: Score 91/100 — 3 min away\n  • Inlax & Budhrani Hospital (Sadhu Vaswani Mission): Score 89/100 — 6 min away\n  • KEM Hospital, Pune: Score 87/100 — 2 min away",
+      "alternatives": [
+        {
+          "hospital": {
+            "id": "fc0d54f1-2f9b-4780-80ba-d14b52e2afae",
+            "name": "Ruby Hall Clinic",
+            "address": "40, Sassoon Road, Pune 411001 (Zone 1 - Dhole Patil Road)",
+            "latitude": "18.5196000",
+            "longitude": "73.8789000",
+            "trauma_level": 1,
+            "phone": null,
+            "total_beds": 553,
+            "icu_beds_total": 65,
+            "icu_beds_available": 0,
+            "ventilators_total": 42,
+            "ventilators_available": 1,
+            "has_cath_lab": true,
+            "has_mri": true,
+            "has_ct_scanner": true,
+            "has_burn_unit": false,
+            "has_stroke_center": true,
+            "has_trauma_bay": true,
+            "is_active": true,
+            "is_on_diversion": false,
+            "current_load_percent": 79,
+            "created_at": "2026-04-03T10:38:12.201Z",
+            "updated_at": "2026-04-03T22:03:49.721Z",
+            "specialists": [
+              {
+                "id": "13417fdb-a428-416d-b2f6-2cb412df17f0",
+                "name": "Dr. Pankaj Shah",
+                "specialty": "cardiologist",
+                "is_on_duty": true,
+                "on_call": false
+              },
+              {
+                "id": "bb97395e-6dad-46f0-8970-205465e8fc17",
+                "name": "Dr. Anjali Deshmukh",
+                "specialty": "cardiac_surgeon",
+                "is_on_duty": true,
+                "on_call": false
+              },
+              {
+                "id": "f26fc15b-2a70-494e-81d6-b191bb97808e",
+                "name": "Dr. Vikram Rane",
+                "specialty": "trauma_surgeon",
+                "is_on_duty": false,
+                "on_call": true
+              }
+            ]
+          },
+          "totalScore": 91,
+          "transitMinutes": 3,
+          "disqualified": false,
+          "breakdown": {
+            "care": 35,
+            "beds": 20,
+            "load": 6,
+            "specialist": 20,
+            "transit": 10
+          }
+        },
+        {
+          "hospital": {
+            "id": "4811e087-45dc-402d-8550-6991567fa25c",
+            "name": "Inlax & Budhrani Hospital (Sadhu Vaswani Mission)",
+            "address": "7, Koregaon Park, Pune 411001 (Zone 1 - Dhole Patil Road)",
+            "latitude": "18.5362000",
+            "longitude": "73.8960000",
+            "trauma_level": 1,
+            "phone": null,
+            "total_beds": 369,
+            "icu_beds_total": 45,
+            "icu_beds_available": 2,
+            "ventilators_total": 30,
+            "ventilators_available": 3,
+            "has_cath_lab": true,
+            "has_mri": true,
+            "has_ct_scanner": true,
+            "has_burn_unit": false,
+            "has_stroke_center": true,
+            "has_trauma_bay": true,
+            "is_active": true,
+            "is_on_diversion": false,
+            "current_load_percent": 81,
+            "created_at": "2026-04-03T10:38:12.201Z",
+            "updated_at": "2026-04-03T22:04:29.745Z",
+            "specialists": [
+              {
+                "id": "bbd1342c-a24b-47e1-8ad2-eee524b3e4b3",
+                "name": "Dr. Sanjay Pawar",
+                "specialty": "cardiologist",
+                "is_on_duty": true,
+                "on_call": false
+              },
+              {
+                "id": "dee521c4-5ebb-47a1-80ff-69250722282f",
+                "name": "Dr. Rahul Bhosale",
+                "specialty": "neurosurgeon",
+                "is_on_duty": true,
+                "on_call": false
+              }
+            ]
+          },
+          "totalScore": 89,
+          "transitMinutes": 6,
+          "disqualified": false,
+          "breakdown": {
+            "care": 35,
+            "beds": 19,
+            "load": 6,
+            "specialist": 20,
+            "transit": 9
+          }
+        },
+        {
+          "hospital": {
+            "id": "9a6368b7-c379-4a4b-a0bd-6f1342aaefab",
+            "name": "KEM Hospital, Pune",
+            "address": "Rasta Peth, Sardar Moodliar Rd, Pune 411011 (Zone 5 - Bhavani Peth)",
+            "latitude": "18.5074000",
+            "longitude": "73.8658000",
+            "trauma_level": 1,
+            "phone": null,
+            "total_beds": 568,
+            "icu_beds_total": 55,
+            "icu_beds_available": 2,
+            "ventilators_total": 35,
+            "ventilators_available": 0,
+            "has_cath_lab": true,
+            "has_mri": true,
+            "has_ct_scanner": true,
+            "has_burn_unit": false,
+            "has_stroke_center": true,
+            "has_trauma_bay": true,
+            "is_active": true,
+            "is_on_diversion": false,
+            "current_load_percent": 84,
+            "created_at": "2026-04-03T10:38:12.201Z",
+            "updated_at": "2026-04-03T22:03:09.725Z",
+            "specialists": [
+              {
+                "id": "ebc105f2-67ed-40f1-8bf1-e3f384d9a1aa",
+                "name": "Dr. Sachin Gadgil",
+                "specialty": "neurosurgeon",
+                "is_on_duty": true,
+                "on_call": false
+              },
+              {
+                "id": "b2e59f18-3328-4227-abb6-cd3c929282c8",
+                "name": "Dr. Kavita Mane",
+                "specialty": "trauma_surgeon",
+                "is_on_duty": true,
+                "on_call": false
+              },
+              {
+                "id": "846ac887-93b9-4284-b401-52f3e64a0121",
+                "name": "Dr. Amit Joshi",
+                "specialty": "cardiologist",
+                "is_on_duty": false,
+                "on_call": true
+              }
+            ]
+          },
+          "totalScore": 87,
+          "transitMinutes": 2,
+          "disqualified": false,
+          "breakdown": {
+            "care": 35,
+            "beds": 16,
+            "load": 6,
+            "specialist": 20,
+            "transit": 10
+          }
+        }
+      ]
+    },
+    "rationale": "ROUTING DECISION: Deenanath Mangeshkar Hospital\nOVERALL SCORE: 91/100\n\nWHY THIS HOSPITAL WAS CHOSEN:\n  • Hospital load: 74%\n  • Estimated arrival: 4 minutes\n  • Trauma Level: 1\n\nALTERNATIVES CONSIDERED:\n  • Ruby Hall Clinic: Score 91/100 — 3 min away\n  • Inlax & Budhrani Hospital (Sadhu Vaswani Mission): Score 89/100 — 6 min away\n  • KEM Hospital, Pune: Score 87/100 — 2 min away"
+  }
+}
