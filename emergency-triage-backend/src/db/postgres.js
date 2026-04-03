@@ -15,9 +15,7 @@ pool.on('error', (err) => {
   console.error('[PostgreSQL] Unexpected client error:', err.message);
 });
 
-/**
- * Execute a query with optional parameters
- */
+
 const query = async (text, params) => {
   const start = Date.now();
   try {
@@ -33,9 +31,7 @@ const query = async (text, params) => {
   }
 };
 
-/**
- * Get a client for transactions
- */
+
 const getClient = async () => {
   const client = await pool.connect();
   const originalQuery = client.query.bind(client);
@@ -49,9 +45,7 @@ const getClient = async () => {
   return client;
 };
 
-/**
- * Run a transaction safely
- */
+
 const transaction = async (callback) => {
   const client = await getClient();
   try {
