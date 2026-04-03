@@ -28,22 +28,27 @@ const hospitalIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-const getAmbulanceIcon = (isSelected: boolean, isIdle: boolean = false) => new L.DivIcon({
-  className: 'bg-transparent border-none',
-  html: isIdle ? `
-    <div style="font-size: 18px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); transform: translate(-5px, -5px);">🚑</div>
-  ` : `
-    <div style="position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; transform: translate(-10px, -10px);">
-      <div class="absolute bg-purple-600/30 rounded-full animate-ping" style="width: 50px; height: 50px; animation-duration: 2s;"></div>
-      <div class="absolute bg-purple-500/20 rounded-full" style="width: 40px; height: 40px;"></div>
-      <div class="relative z-10 bg-white rounded-lg p-1 shadow-md border border-purple-200 text-lg flex items-center justify-center leading-none" style="width: 28px; height: 28px;">
-        🚑
-      </div>
+const idleAmbulanceIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/2.0.0/images/marker-shadow.png',
+  iconSize: [18, 30],
+  iconAnchor: [9, 30],
+  popupAnchor: [1, -24],
+  shadowSize: [30, 30]
+});
+
+const activeAmbulanceIcon = new L.DivIcon({
+  className: 'ambulance-active-icon',
+  html: `
+    <div style="position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center;">
+      <div style="position:absolute;width:44px;height:44px;border-radius:50%;background:rgba(239,68,68,0.25);animation:pulse-ring 1.5s ease-out infinite;"></div>
+      <div style="position:absolute;width:30px;height:30px;border-radius:50%;background:rgba(239,68,68,0.15);"></div>
+      <div style="position:relative;z-index:10;width:30px;height:30px;background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:2px solid #ef4444;display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;">🚑</div>
     </div>
   `,
-  iconSize: isIdle ? [20, 20] : [40, 40],
-  iconAnchor: isIdle ? [10, 10] : [20, 20],
-  popupAnchor: [0, -20],
+  iconSize: [44, 44],
+  iconAnchor: [22, 22],
+  popupAnchor: [0, -22],
 });
 
 const incidentIcon = new L.Icon({
@@ -118,10 +123,11 @@ const INITIAL_HOSPITALS: Hospital[] = [];
 const INITIAL_PATIENTS: Patient[] = [];
 
 const generateAmbulances = (centerLat: number, centerLng: number) => {
-  return Array.from({length: 6}).map((_, i) => ({
-    id: 'AMB-' + (100 + i),
-    lat: centerLat + (Math.random() - 0.5) * 0.08,
-    lng: centerLng + (Math.random() - 0.5) * 0.08,
+  const names = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel'];
+  return Array.from({length: 8}).map((_, i) => ({
+    id: 'AMB-' + names[i],
+    lat: centerLat + (Math.random() - 0.5) * 0.04,
+    lng: centerLng + (Math.random() - 0.5) * 0.04,
   }));
 };
 
@@ -780,15 +786,22 @@ export default function App() {
               </Marker>
             ))}
 
-            {/* Available Ambulances */}
-            {availableAmbulances.map(a => (
-              <Marker key={a.id} position={[a.lat, a.lng]} icon={getAmbulanceIcon(false, true)} zIndexOffset={500}>
-                <Popup>
-                  <div className="font-bold">{a.id}</div>
-                  <div className="text-xs">Idle / Available Unit</div>
-                </Popup>
-              </Marker>
-            ))}
+            {/* Available Ambulances - Tiny green markers */}
+            {availableAmbulances.map(a => {
+              const dist = Math.sqrt(Math.pow(a.lat - newPatient.lat, 2) + Math.pow(a.lng - newPatient.lng, 2));
+              const eta = Math.max(1, Math.round(dist * 111 * 1.5));
+              return (
+                <Marker key={a.id} position={[a.lat, a.lng]} icon={idleAmbulanceIcon} zIndexOffset={600}>
+                  <Popup>
+                    <div style={{minWidth: 140}}>
+                      <div className="font-bold text-sm">🚑 {a.id}</div>
+                      <div className="text-xs text-gray-600 mt-1">Status: <span className="text-green-600 font-semibold">Available</span></div>
+                      <div className="text-xs mt-1">ETA to you: <strong className="text-blue-600">{eta} min</strong></div>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
 
             {/* Patient Markers & Routes */}
             {patients.map(p => {
@@ -805,7 +818,7 @@ export default function App() {
                   </Marker>
                   
                   {/* The actual moving Ambulance */}
-                  <Marker position={[p.ambulanceLat, p.ambulanceLng]} icon={getAmbulanceIcon(isSelected)} zIndexOffset={isSelected ? 1000 : 0}>
+                  <Marker position={[p.ambulanceLat, p.ambulanceLng]} icon={activeAmbulanceIcon} zIndexOffset={isSelected ? 1000 : 800}>
                     <Popup>
                       <div className="font-bold">Unit {p.id}</div>
                       <div className="text-xs">{p.severity}</div>
