@@ -1,18 +1,16 @@
 const Joi = require('joi');
 
-// ============================================================
-// PATIENT / DISPATCH VALIDATION
-// ============================================================
+
 
 const patientVitalsSchema = Joi.object({
   incident_id: Joi.string().max(100).optional(),
-  
-  // Demographics
+
+
   age: Joi.number().integer().min(0).max(120).optional(),
   gender: Joi.string().valid('male', 'female', 'other', 'unknown').optional(),
   weight_kg: Joi.number().min(0).max(400).optional(),
 
-  // Vitals
+
   heart_rate: Joi.number().integer().min(0).max(300).required()
     .messages({ 'any.required': 'Heart rate is required' }),
   systolic_bp: Joi.number().integer().min(0).max(300).required()
@@ -27,19 +25,19 @@ const patientVitalsSchema = Joi.object({
     .messages({ 'any.required': 'GCS score is required' }),
   blood_glucose: Joi.number().min(0).max(1000).optional(),
 
-  // Symptoms and context
+
   symptoms: Joi.array().items(Joi.string().max(100)).max(20).optional(),
   mechanism_of_injury: Joi.string().max(255).optional(),
   chief_complaint: Joi.string().max(500).optional(),
 
-  // Incident location (required for routing)
+
   incident_latitude: Joi.number().min(-90).max(90).required()
     .messages({ 'any.required': 'Incident latitude is required' }),
   incident_longitude: Joi.number().min(-180).max(180).required()
     .messages({ 'any.required': 'Incident longitude is required' }),
   incident_address: Joi.string().max(500).optional(),
 
-  // MCE
+
   mce_id: Joi.string().max(100).optional(),
 });
 
@@ -54,9 +52,7 @@ const batchDispatchSchema = Joi.object({
     .messages({ 'any.required': 'Patient list is required for batch dispatch' }),
 });
 
-// ============================================================
-// HOSPITAL VALIDATION
-// ============================================================
+
 
 const hospitalCapacityUpdateSchema = Joi.object({
   icu_beds_available: Joi.number().integer().min(0).optional(),
@@ -65,9 +61,7 @@ const hospitalCapacityUpdateSchema = Joi.object({
   is_on_diversion: Joi.boolean().optional(),
 }).min(1).messages({ 'object.min': 'At least one field must be provided for update' });
 
-// ============================================================
-// REROUTE VALIDATION
-// ============================================================
+
 
 const rerouteSchema = Joi.object({
   reason: Joi.string().max(255).required(),
@@ -75,9 +69,6 @@ const rerouteSchema = Joi.object({
   current_longitude: Joi.number().min(-180).max(180).optional(),
 });
 
-// ============================================================
-// VALIDATION MIDDLEWARE FACTORY
-// ============================================================
 
 const validate = (schema) => (req, res, next) => {
   const { error, value } = schema.validate(req.body, { abortEarly: false, stripUnknown: true });
@@ -91,7 +82,7 @@ const validate = (schema) => (req, res, next) => {
       })),
     });
   }
-  req.body = value; // use sanitized value
+  req.body = value;
   next();
 };
 

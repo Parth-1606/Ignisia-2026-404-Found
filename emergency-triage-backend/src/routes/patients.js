@@ -2,6 +2,28 @@ const express = require('express');
 const router = express.Router();
 const { asyncHandler } = require('../middleware/errorHandler');
 const { query } = require('../db/postgres');
+const { getRandomVitals, getMultipleRandomVitals } = require('../services/vitalsDataService');
+
+/**
+ * GET /api/patients/vitals/random
+ * Returns real patient vitals from the 200K-record dataset
+ * Query params: ?risk=High Risk | Low Risk  &count=5
+ */
+router.get('/vitals/random', asyncHandler(async (req, res) => {
+  const { risk, count = 1 } = req.query;
+  const n = Math.min(parseInt(count) || 1, 20);
+
+  if (n === 1) {
+    const vitals = getRandomVitals(risk || null);
+    if (!vitals) {
+      return res.status(500).json({ success: false, error: 'Vitals dataset not available' });
+    }
+    return res.json({ success: true, data: vitals });
+  }
+
+  const vitals = getMultipleRandomVitals(n, risk || null);
+  res.json({ success: true, count: vitals.length, data: vitals });
+}));
 
 /**
  * GET /api/patients

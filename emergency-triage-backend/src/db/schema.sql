@@ -1,13 +1,7 @@
--- ============================================================
--- EMERGENCY TRIAGE SYSTEM — DATABASE SCHEMA
--- ============================================================
 
--- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ============================================================
--- HOSPITALS TABLE
--- ============================================================
+
 CREATE TABLE IF NOT EXISTS hospitals (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name VARCHAR(255) NOT NULL,
@@ -17,12 +11,11 @@ CREATE TABLE IF NOT EXISTS hospitals (
   trauma_level INTEGER CHECK (trauma_level BETWEEN 1 AND 5), -- Level 1 = highest capability
   phone VARCHAR(20),
 
-  -- Bed capacity
+ 
   total_beds INTEGER NOT NULL DEFAULT 0,
   icu_beds_total INTEGER NOT NULL DEFAULT 0,
   icu_beds_available INTEGER NOT NULL DEFAULT 0,
 
-  -- Equipment
   ventilators_total INTEGER NOT NULL DEFAULT 0,
   ventilators_available INTEGER NOT NULL DEFAULT 0,
   has_cath_lab BOOLEAN DEFAULT false,
@@ -32,7 +25,7 @@ CREATE TABLE IF NOT EXISTS hospitals (
   has_stroke_center BOOLEAN DEFAULT false,
   has_trauma_bay BOOLEAN DEFAULT false,
 
-  -- Status
+ 
   is_active BOOLEAN DEFAULT true,
   is_on_diversion BOOLEAN DEFAULT false, -- Hospital diverting ambulances
   current_load_percent INTEGER DEFAULT 0 CHECK (current_load_percent BETWEEN 0 AND 100),
@@ -41,9 +34,7 @@ CREATE TABLE IF NOT EXISTS hospitals (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- ============================================================
--- SPECIALISTS TABLE
--- ============================================================
+
 CREATE TABLE IF NOT EXISTS specialists (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   hospital_id UUID REFERENCES hospitals(id) ON DELETE CASCADE,
@@ -56,9 +47,7 @@ CREATE TABLE IF NOT EXISTS specialists (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
--- ============================================================
--- PATIENTS TABLE
--- ============================================================
+
 CREATE TABLE IF NOT EXISTS patients (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   incident_id VARCHAR(100) UNIQUE NOT NULL, -- EMT incident number
@@ -100,9 +89,7 @@ CREATE TABLE IF NOT EXISTS patients (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- ============================================================
--- DISPATCHES TABLE
--- ============================================================
+
 CREATE TABLE IF NOT EXISTS dispatches (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
@@ -131,9 +118,7 @@ CREATE TABLE IF NOT EXISTS dispatches (
   recalculation_log JSONB DEFAULT '[]'
 );
 
--- ============================================================
--- HOSPITAL CAPACITY LOG (for analytics)
--- ============================================================
+
 CREATE TABLE IF NOT EXISTS hospital_capacity_log (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   hospital_id UUID REFERENCES hospitals(id) ON DELETE CASCADE,
@@ -143,9 +128,7 @@ CREATE TABLE IF NOT EXISTS hospital_capacity_log (
   logged_at TIMESTAMP DEFAULT NOW()
 );
 
--- ============================================================
--- MASS CASUALTY EVENTS TABLE
--- ============================================================
+
 CREATE TABLE IF NOT EXISTS mass_casualty_events (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   incident_id VARCHAR(100) UNIQUE NOT NULL,
@@ -158,9 +141,7 @@ CREATE TABLE IF NOT EXISTS mass_casualty_events (
   resolved_at TIMESTAMP
 );
 
--- ============================================================
--- INDEXES
--- ============================================================
+
 CREATE INDEX IF NOT EXISTS idx_hospitals_location ON hospitals(latitude, longitude);
 CREATE INDEX IF NOT EXISTS idx_hospitals_active ON hospitals(is_active, is_on_diversion);
 CREATE INDEX IF NOT EXISTS idx_specialists_hospital ON specialists(hospital_id, specialty, is_on_duty);
@@ -168,9 +149,7 @@ CREATE INDEX IF NOT EXISTS idx_patients_status ON patients(status);
 CREATE INDEX IF NOT EXISTS idx_dispatches_patient ON dispatches(patient_id);
 CREATE INDEX IF NOT EXISTS idx_dispatches_hospital ON dispatches(assigned_hospital_id);
 
--- ============================================================
--- TRIGGER: auto-update updated_at
--- ============================================================
+
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN

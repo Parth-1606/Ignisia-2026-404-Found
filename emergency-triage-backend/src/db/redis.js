@@ -24,50 +24,35 @@ const getClient = () => {
   return client;
 };
 
-// ============================================================
-// HOSPITAL CAPACITY CACHE
-// Keys: hospital:{id}:capacity
-// TTL: 60 seconds (refreshed on every update)
-// ============================================================
 
 const HOSPITAL_CAPACITY_TTL = 60; // seconds
 const ALL_HOSPITALS_TTL = 30;
 
-/**
- * Cache live hospital capacity snapshot
- */
+
 const setHospitalCapacity = async (hospitalId, capacityData) => {
   const key = `hospital:${hospitalId}:capacity`;
   await client.setEx(key, HOSPITAL_CAPACITY_TTL, JSON.stringify(capacityData));
 };
 
-/**
- * Get cached hospital capacity
- */
+
 const getHospitalCapacity = async (hospitalId) => {
   const key = `hospital:${hospitalId}:capacity`;
   const data = await client.get(key);
   return data ? JSON.parse(data) : null;
 };
 
-/**
- * Cache entire hospital grid (for routing engine)
- */
+
 const setAllHospitals = async (hospitals) => {
   await client.setEx('hospitals:all', ALL_HOSPITALS_TTL, JSON.stringify(hospitals));
 };
 
-/**
- * Get cached hospital grid
- */
+
 const getAllHospitals = async () => {
   const data = await client.get('hospitals:all');
   return data ? JSON.parse(data) : null;
 };
 
-/**
- * Invalidate hospital cache (call after any capacity update)
- */
+
 const invalidateHospitalCache = async (hospitalId) => {
   await Promise.all([
     client.del(`hospital:${hospitalId}:capacity`),
@@ -75,10 +60,6 @@ const invalidateHospitalCache = async (hospitalId) => {
   ]);
 };
 
-// ============================================================
-// ACTIVE DISPATCH TRACKING
-// Keys: dispatch:active:{patientId}
-// ============================================================
 
 const setActiveDispatch = async (patientId, dispatchData) => {
   const key = `dispatch:active:${patientId}`;
@@ -95,10 +76,7 @@ const removeActiveDispatch = async (patientId) => {
   await client.del(`dispatch:active:${patientId}`);
 };
 
-// ============================================================
-// MASS CASUALTY EVENT: Hospital assignment tracking
-// Prevents one hospital from being overloaded during MCE
-// ============================================================
+
 
 const incrementMCEAssignment = async (mceId, hospitalId) => {
   const key = `mce:${mceId}:hospital:${hospitalId}:count`;
@@ -113,9 +91,7 @@ const getMCEAssignmentCount = async (mceId, hospitalId) => {
   return parseInt(count) || 0;
 };
 
-/**
- * Get all hospital assignment counts for an MCE event
- */
+
 const getMCEAllAssignments = async (mceId) => {
   const pattern = `mce:${mceId}:hospital:*:count`;
   const keys = await client.keys(pattern);
@@ -127,9 +103,7 @@ const getMCEAllAssignments = async (mceId) => {
   return assignments;
 };
 
-// ============================================================
-// GENERIC CACHE HELPERS
-// ============================================================
+
 
 const set = async (key, value, ttl = 300) => {
   await client.setEx(key, ttl, JSON.stringify(value));

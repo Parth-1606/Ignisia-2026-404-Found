@@ -4,6 +4,7 @@ const app = require('./app');
 const { testConnection: testPG } = require('./db/postgres');
 const redis = require('./db/redis');
 const { initWebSocket } = require('./websocket/broadcaster');
+const { startSimulation, stopSimulation } = require('./services/simulationEngine');
 
 const PORT = parseInt(process.env.PORT) || 3000;
 
@@ -47,13 +48,17 @@ const startServer = async () => {
     console.log(`  GET    /api/hospitals               — All hospitals + capacity`);
     console.log(`  PATCH  /api/hospitals/:id/capacity  — Update hospital capacity`);
     console.log(`  GET    /api/patients                — Patient list`);
-    console.log(`  GET    /api/patients/analytics/summary — Dashboard stats`);
+    console.log(`  GET    /api/patients/vitals/random — Random real vitals from CSV`);
     console.log('\n========================================\n');
+
+    // ---- Start Real-Time Simulation ----
+    startSimulation();
   });
 
   // ---- Graceful shutdown ----
   const shutdown = async (signal) => {
     console.log(`\n[Server] ${signal} received. Shutting down gracefully...`);
+    stopSimulation();
     server.close(async () => {
       console.log('[Server] HTTP server closed');
       try {
