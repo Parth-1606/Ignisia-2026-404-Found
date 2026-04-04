@@ -325,38 +325,28 @@ const MiniMapPreview = ({ activeEmergency }: { activeEmergency: Emergency | null
           </div>
         )}
 
-        {/* Route Line */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none">
-          <motion.path 
-            d="M 50 150 Q 150 100 250 200 T 350 50" 
-            fill="none" 
-            stroke="rgba(255, 215, 0, 0.3)" 
-            strokeWidth="4" 
-            strokeDasharray="8 8"
-            animate={{ strokeDashoffset: [0, -16] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-          />
-          <path d="M 50 150 Q 150 100 250 200 T 350 50" fill="none" stroke="gold" strokeWidth="2" opacity="0.5" />
-        </svg>
-
-        {/* Ambulance Marker */}
-        <motion.div 
-          initial={{ x: 50, y: 150 }}
-          animate={{ x: [50, 150, 250, 350], y: [150, 100, 200, 50] }}
-          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-          className="absolute w-6 h-6 -ml-3 -mt-3 flex items-center justify-center z-10"
-        >
-          <div className="absolute inset-0 bg-gold/20 rounded-full animate-ping" />
-          <div className="w-3 h-3 bg-gold rounded-full shadow-[0_0_10px_gold]" />
-        </motion.div>
-
-        {/* Hospital Marker */}
-        <div className="absolute top-[50px] left-[350px] -ml-4 -mt-4 flex flex-col items-center gap-1">
-          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-black shadow-lg">
-            <Hospital className="w-5 h-5" />
+        {/* Scanning Grid Overlay */}
+        <div className="absolute inset-0 opacity-20 pointer-events-none">
+          <div className="absolute inset-0 grid grid-cols-10 grid-rows-10">
+            {Array.from({ length: 100 }).map((_, i) => (
+              <div key={i} className="border-[0.5px] border-gold/20" />
+            ))}
           </div>
-          <span className="text-[8px] font-bold bg-black/80 px-1 rounded">ST. MARY'S</span>
+          <motion.div 
+            animate={{ top: ['-10%', '110%'] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+            className="absolute left-0 right-0 h-px bg-gold/50 shadow-[0_0_15px_gold]"
+          />
         </div>
+
+        {!activeEmergency && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center space-y-2 opacity-30">
+              <Activity className="w-8 h-8 mx-auto animate-pulse" />
+              <p className="text-[10px] font-bold uppercase tracking-widest">Scanning for active units...</p>
+            </div>
+          </div>
+        )}
 
         {/* Legend */}
         {activeEmergency && (
