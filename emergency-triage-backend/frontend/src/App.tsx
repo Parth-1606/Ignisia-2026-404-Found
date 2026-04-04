@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import * as tf from '@tensorflow/tfjs';
 import * as mobilenet from '@tensorflow-models/mobilenet';
 import '@tensorflow/tfjs-backend-webgl';
@@ -20,6 +21,9 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
+
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+const WS_URL = `${API_BASE.replace(/^http/, 'ws')}/ws`;
 
 // Custom Icons
 const hospitalIcon = new L.Icon({
@@ -205,6 +209,7 @@ export default function App() {
   const [visionAnalysis, setVisionAnalysis] = useState<{ traumaLevel: string; override: boolean; reason: string } | null>(null);
   const [mobilenetModel, setMobilenetModel] = useState<any>(null);
   const [isModelLoading, setIsModelLoading] = useState(true);
+  const [hasAutoDispatched, setHasAutoDispatched] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -238,6 +243,7 @@ export default function App() {
       setScenePhoto(src);
       setIsScanningPhoto(true);
       setVisionAnalysis(null);
+      setHasAutoDispatched(false);
       const img = document.createElement('img');
       img.src = src;
       img.onload = async () => {
@@ -252,7 +258,15 @@ export default function App() {
             const prob = (predictions[0].probability * 100).toFixed(1) + '%';
             if (isHighSeverity) {
               setVisionAnalysis({ traumaLevel: 'LEVEL_1_TRAUMA', override: true, reason: `Critical Vision Alert: "${topLabel}" detected (${prob} confidence). High-severity vehicle scene. Overriding routing to Level 1 Trauma Center.` });
-              setNewPatient(prev => ({ ...prev, hr: 130, bp: '90/60', spo2: 92, gcs: 8, symptoms: 'Unresponsive, crush trauma, vehicle collision' }));
+              
+              // Set critical vitals automatically
+              setNewPatient(prev => ({ ...prev, hr: 130, bp: '90/60', spo2: 92, gcs: 8, symptoms: 'Unresponsive, crash trauma, vehicle collision (Vision Detected)' }));
+              
+              // Auto-dispatch if location is already set
+              if (userLocation || (newPatient.lat !== 18.5204)) {
+                setTimeout(() => triggerSOS(), 1000);
+                setHasAutoDispatched(true);
+              }
             } else {
               setVisionAnalysis({ traumaLevel: 'STANDARD', override: false, reason: `Scan complete: "${topLabel}" detected (${prob} confidence). No high-severity trauma signatures found. Standard routing applies.` });
             }
@@ -270,7 +284,7 @@ export default function App() {
   useEffect(() => {
     const fetchHospitals = async () => {
       try {
-        const res = await fetch('http://localhost:3000/api/hospitals');
+        const res = await fetch(`${API_BASE}/api/hospitals`);
         const data = await res.json();
         if (data.success) {
           setHospitals(data.data.map(mapHospital));
@@ -287,7 +301,7 @@ export default function App() {
     let reconnectTimeout: any;
 
     const connectWS = () => {
-      ws = new WebSocket('ws://localhost:3000/ws');
+      ws = new WebSocket(WS_URL);
       
       ws.onmessage = (event) => {
         try {
@@ -424,7 +438,7 @@ export default function App() {
   const fillScenario = async (type: 'cardiac' | 'trauma' | 'stable') => {
     try {
       const risk = type === 'stable' ? 'Low Risk' : 'High Risk';
-      const res = await fetch(`http://localhost:3000/api/patients/vitals/random?risk=${encodeURIComponent(risk)}`);
+      const res = await fetch(`${API_BASE}/api/patients/vitals/random?risk=${encodeURIComponent(risk)}`);
       const data = await res.json();
       if (data.success && data.data) {
         const v = data.data;
@@ -452,6 +466,10 @@ export default function App() {
 
   const handleLocationSelect = (lat: number, lng: number) => {
     setNewPatient(prev => ({ ...prev, lat, lng }));
+    if (visionAnalysis?.override && !hasAutoDispatched) {
+      setTimeout(() => triggerSOS(), 500);
+      setHasAutoDispatched(true);
+    }
   };
 
   const handlePatientSelect = (patient: Patient) => {
@@ -473,6 +491,10 @@ export default function App() {
         setUserLocation([latitude, longitude]);
         setMapCenter([latitude, longitude]);
         setGpsLoading(false);
+        if (visionAnalysis?.override && !hasAutoDispatched) {
+          setTimeout(() => triggerSOS(), 500);
+          setHasAutoDispatched(true);
+        }
       },
       (error) => {
         setGpsLoading(false);
@@ -522,7 +544,7 @@ export default function App() {
     };
 
     try {
-      const res = await fetch(`http://localhost:3000/api/dispatch`, {
+      const res = await fetch(`${API_BASE}/api/dispatch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -606,7 +628,7 @@ export default function App() {
         setNewPatient(prev => ({ ...prev, symptoms: '' }));
         
         // Refresh hospitals to get updated load/capacity
-        const hRes = await fetch('http://localhost:3000/api/hospitals');
+        const hRes = await fetch(`${API_BASE}/api/hospitals`);
         const hData = await hRes.json();
         if (hData.success) {
           setHospitals(hData.data.map(mapHospital));
@@ -721,7 +743,7 @@ export default function App() {
     };
 
     try {
-      const res = await fetch('http://localhost:3000/api/dispatch', {
+      const res = await fetch(`${API_BASE}/api/dispatch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -730,7 +752,19 @@ export default function App() {
 
       if (data.success) {
         const { prediction, routing } = data.data;
-        const bestHospital = routing?.optimal?.hospital;
+        let bestHospital = routing?.optimal?.hospital;
+
+        // Vision AI Override: If scene photo detected high-severity vehicle, force Level 1 Trauma Center
+        if (visionAnalysis?.override) {
+          const level1Centers = hospitals.filter(h => h.hasNeuro && h.hasCathLab);
+          if (level1Centers.length > 0) {
+            bestHospital = level1Centers.reduce((prev, curr) => {
+              const dp = Math.pow(prev.lat - lat, 2) + Math.pow(prev.lng - lng, 2);
+              const dc = Math.pow(curr.lat - lat, 2) + Math.pow(curr.lng - lng, 2);
+              return dc < dp ? curr : prev;
+            });
+          }
+        }
 
         // Find nearest ambulance
         let nearestAmb = availableAmbulances.length > 0 ? availableAmbulances[0] : null;
@@ -763,14 +797,16 @@ export default function App() {
           currentRoutePhase: 'TO_PATIENT',
           currentRouteIndex: 0,
           vitals: { hr: 140, bp: '80/50', spo2: 85, gcs: 6 },
-          symptoms: 'SOS EMERGENCY — Automated Critical Dispatch',
+          symptoms: visionAnalysis?.override ? `CRITICAL L1 TRAUMA: ${visionAnalysis.reason}` : 'SOS EMERGENCY — Automated Critical Dispatch',
           predictedNeeds: [
             ...(prediction.predictedCareNeeds?.equipment || []),
             prediction.predictedCareNeeds?.specialist
           ].filter(Boolean) as string[],
           severity: 'Critical',
           assignedHospitalId: bestHospital?.id || null,
-          routingRationale: '🚨 SOS AUTOMATED DISPATCH: Critical distress signal received. Nearest unit dispatched immediately to GPS location. No manual triage required.',
+          routingRationale: visionAnalysis?.override 
+            ? '🚨 VISION-TRIGGERED L1 DISPATCH: High-severity vehicle collision detected. Forced routing to nearest neuro-qualified Level 1 Trauma Center. SOS signal automated.'
+            : '🚨 SOS AUTOMATED DISPATCH: Critical distress signal received. Nearest unit dispatched immediately to GPS location. No manual triage required.',
           eta: routing?.optimal?.transitMinutes || 0,
         };
 
@@ -779,7 +815,7 @@ export default function App() {
         setMapCenter([lat, lng]);
 
         // Refresh hospitals
-        const hRes = await fetch('http://localhost:3000/api/hospitals');
+        const hRes = await fetch(`${API_BASE}/api/hospitals`);
         const hData = await hRes.json();
         if (hData.success) setHospitals(hData.data.map(mapHospital));
       }
@@ -799,6 +835,18 @@ export default function App() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
+
+  // Text-to-Speech using SpeechSynthesis API
+  const speak = (text: string) => {
+    if (!('speechSynthesis' in window)) return;
+    // Cancel existing speech before starting new one
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.lang = 'en-US';
+    window.speechSynthesis.speak(utterance);
+  };
 
   // Voice-to-Text using Web Speech API
   const toggleVoice = () => {
@@ -829,7 +877,7 @@ export default function App() {
     setIsAiThinking(true);
 
     try {
-      const res = await fetch('http://localhost:3000/api/chat', {
+      const res = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -849,11 +897,16 @@ export default function App() {
       const data = await res.json();
       if (data.success) {
         setChatMessages(prev => [...prev, { sender: 'ai', text: data.response }]);
+        speak(data.response); // NEW: Speak the AI reply aloud
       } else {
-        setChatMessages(prev => [...prev, { sender: 'ai', text: 'Request failed. Please try again.' }]);
+        const errorMsg = 'I apologize, but I am having trouble connecting to the dispatch network right now.';
+        setChatMessages(prev => [...prev, { sender: 'ai', text: errorMsg }]);
+        speak(errorMsg);
       }
     } catch {
-      setChatMessages(prev => [...prev, { sender: 'ai', text: 'Cannot reach dispatch server. Check that the backend is running on port 3000.' }]);
+      const errorMsg = `I cannot reach the dispatch server. Please ensure the backend is active at ${API_BASE}.`;
+      setChatMessages(prev => [...prev, { sender: 'ai', text: errorMsg }]);
+      speak(errorMsg);
     } finally {
       setIsAiThinking(false);
     }
@@ -982,91 +1035,161 @@ export default function App() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="symptoms" className="text-sm font-semibold">Reported Symptoms</Label>
-                <Input 
-                  id="symptoms" 
-                  placeholder="e.g., Severe chest pain, shortness of breath" 
-                  value={newPatient.symptoms}
-                  onChange={e => setNewPatient({...newPatient, symptoms: e.target.value})}
-                  required
-                  className="bg-gray-50"
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border">
-                <div className="space-y-1">
-                  <Label htmlFor="hr" className="text-xs font-semibold text-slate-600">Heart Rate</Label>
-                  <div className="flex items-center gap-2">
-                    <Input id="hr" type="number" value={newPatient.hr} onChange={e => setNewPatient({...newPatient, hr: parseInt(e.target.value)})} className="h-8" />
-                    <span className="text-xs text-slate-400 w-8">bpm</span>
+              {visionAnalysis?.override ? (
+                <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-red-600 p-2 rounded-lg shadow-lg">
+                      <AlertTriangle className="h-6 w-6 text-white animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-red-900 leading-none">LEVEL 1 EMERGENCY</h3>
+                      <p className="text-[10px] text-red-700 font-semibold uppercase tracking-wider mt-0.5">Vision AI Override Active</p>
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="bp" className="text-xs font-semibold text-slate-600">Blood Pressure</Label>
-                  <div className="flex items-center gap-2">
-                    <Input id="bp" value={newPatient.bp} onChange={e => setNewPatient({...newPatient, bp: e.target.value})} className="h-8" />
-                    <span className="text-xs text-slate-400 w-8">mmHg</span>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="spo2" className="text-xs font-semibold text-slate-600">SpO2</Label>
-                  <div className="flex items-center gap-2">
-                    <Input id="spo2" type="number" value={newPatient.spo2} onChange={e => setNewPatient({...newPatient, spo2: parseInt(e.target.value)})} className="h-8" />
-                    <span className="text-xs text-slate-400 w-8">%</span>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="gcs" className="text-xs font-semibold text-slate-600">GCS Score</Label>
-                  <div className="flex items-center gap-2">
-                    <Input id="gcs" type="number" min="3" max="15" value={newPatient.gcs} onChange={e => setNewPatient({...newPatient, gcs: parseInt(e.target.value)})} className="h-8" />
-                    <span className="text-xs text-slate-400 w-8">/15</span>
-                  </div>
-                </div>
-              </div>
+                  
+                  <div className="space-y-3">
+                    <div className="bg-white/80 backdrop-blur-sm p-3 rounded-lg border border-red-100 shadow-sm">
+                      <Label className="text-[10px] font-bold text-red-800 uppercase flex items-center gap-1.5 mb-1.5">
+                        <MapPin className="h-3 w-3" /> Incident Location
+                      </Label>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleUseGPS}
+                          disabled={gpsLoading}
+                          className="flex-1 h-9 bg-white border-red-200 text-red-700 hover:bg-red-50"
+                        >
+                          {gpsLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Crosshair className="h-4 w-4 mr-2" />}
+                          GPS
+                        </Button>
+                        <div className="flex-1 flex items-center justify-center text-[10px] font-bold text-slate-500 border border-dashed rounded-md bg-slate-50 px-2 text-center leading-tight">
+                          Or click map to set location
+                        </div>
+                      </div>
+                    </div>
 
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-blue-500" /> 
-                  Incident Location
-                </Label>
-                <div className="flex gap-2">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-3 text-sm text-blue-800 flex-1">
-                    <MousePointerClick className="h-5 w-5 text-blue-500 shrink-0 animate-pulse" />
-                    <span className="flex-1 text-xs">Click map or use GPS</span>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleUseGPS}
-                    disabled={gpsLoading}
-                    className="h-auto px-3 py-2 flex flex-col items-center gap-1 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 text-emerald-600 shrink-0"
-                  >
-                    {gpsLoading ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <Crosshair className="h-5 w-5" />
+                    <div className="bg-white/60 p-3 rounded-lg border border-red-50">
+                      <p className="text-[11px] text-red-800 leading-relaxed font-medium italic">
+                        "{visionAnalysis.reason}"
+                      </p>
+                    </div>
+
+                    <Button 
+                      type="button" 
+                      variant="destructive"
+                      onClick={triggerSOS}
+                      disabled={sosActive || !(userLocation || newPatient.lat !== 18.5204)}
+                      className="w-full h-14 bg-red-600 hover:bg-red-700 text-white font-black text-lg tracking-widest shadow-xl ring-4 ring-red-100 animate-bounce-subtle"
+                    >
+                      {sosActive ? 'DISPATCHING...' : hasAutoDispatched ? 'DISPATCHED' : 'INSTANT DISPATCH'}
+                    </Button>
+                    
+                    {!hasAutoDispatched && !(userLocation || newPatient.lat !== 18.5204) && (
+                      <p className="text-[10px] text-red-600 font-bold text-center animate-pulse">
+                        ⚠ Please verify location on map to activate dispatch
+                      </p>
                     )}
-                    <span className="text-[10px] font-semibold">{gpsLoading ? 'Locating...' : 'Use GPS'}</span>
-                  </Button>
-                </div>
-                {userLocation && (
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 flex items-center gap-2 text-xs text-emerald-700">
-                    <Crosshair className="h-3.5 w-3.5 shrink-0" />
-                    <span>GPS location acquired: {userLocation[0].toFixed(4)}, {userLocation[1].toFixed(4)}</span>
                   </div>
-                )}
-                <div className="grid grid-cols-2 gap-2 opacity-50 pointer-events-none">
-                  <Input value={newPatient.lat.toFixed(4)} readOnly className="h-8 text-xs bg-gray-100" />
-                  <Input value={newPatient.lng.toFixed(4)} readOnly className="h-8 text-xs bg-gray-100" />
+                  
+                  <button 
+                    type="button"
+                    onClick={() => { setVisionAnalysis(null); setScenePhoto(null); setHasAutoDispatched(false); }}
+                    className="w-full text-[10px] font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest pt-2"
+                  >
+                    Cancel Override & Return to Manual Triage
+                  </button>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="symptoms" className="text-sm font-semibold">Reported Symptoms</Label>
+                    <Input 
+                      id="symptoms" 
+                      placeholder="e.g., Severe chest pain, shortness of breath" 
+                      value={newPatient.symptoms}
+                      onChange={e => setNewPatient({...newPatient, symptoms: e.target.value})}
+                      required
+                      className="bg-gray-50"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border">
+                    <div className="space-y-1">
+                      <Label htmlFor="hr" className="text-xs font-semibold text-slate-600">Heart Rate</Label>
+                      <div className="flex items-center gap-2">
+                        <Input id="hr" type="number" value={newPatient.hr} onChange={e => setNewPatient({...newPatient, hr: parseInt(e.target.value)})} className="h-8" />
+                        <span className="text-xs text-slate-400 w-8">bpm</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="bp" className="text-xs font-semibold text-slate-600">Blood Pressure</Label>
+                      <div className="flex items-center gap-2">
+                        <Input id="bp" value={newPatient.bp} onChange={e => setNewPatient({...newPatient, bp: e.target.value})} className="h-8" />
+                        <span className="text-xs text-slate-400 w-8">mmHg</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="spo2" className="text-xs font-semibold text-slate-600">SpO2</Label>
+                      <div className="flex items-center gap-2">
+                        <Input id="spo2" type="number" value={newPatient.spo2} onChange={e => setNewPatient({...newPatient, spo2: parseInt(e.target.value)})} className="h-8" />
+                        <span className="text-xs text-slate-400 w-8">%</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="gcs" className="text-xs font-semibold text-slate-600">GCS Score</Label>
+                      <div className="flex items-center gap-2">
+                        <Input id="gcs" type="number" min="3" max="15" value={newPatient.gcs} onChange={e => setNewPatient({...newPatient, gcs: parseInt(e.target.value)})} className="h-8" />
+                        <span className="text-xs text-slate-400 w-8">/15</span>
+                      </div>
+                    </div>
+                  </div>
 
-              <Button type="submit" size="lg" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md">
-                <Navigation className="mr-2 h-4 w-4" />
-                Predict Needs & Route Unit
-              </Button>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-blue-500" /> 
+                      Incident Location
+                    </Label>
+                    <div className="flex gap-2">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-3 text-sm text-blue-800 flex-1">
+                        <MousePointerClick className="h-5 w-5 text-blue-500 shrink-0 animate-pulse" />
+                        <span className="flex-1 text-xs">Click map or use GPS</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleUseGPS}
+                        disabled={gpsLoading}
+                        className="h-auto px-3 py-2 flex flex-col items-center gap-1 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 text-emerald-600 shrink-0"
+                      >
+                        {gpsLoading ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <Crosshair className="h-5 w-5" />
+                        )}
+                        <span className="text-[10px] font-semibold">{gpsLoading ? 'Locating...' : 'Use GPS'}</span>
+                      </Button>
+                    </div>
+                    {userLocation && (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 flex items-center gap-2 text-xs text-emerald-700">
+                        <Crosshair className="h-3.5 w-3.5 shrink-0" />
+                        <span>GPS location acquired: {userLocation[0].toFixed(4)}, {userLocation[1].toFixed(4)}</span>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-2 opacity-50 pointer-events-none">
+                      <Input value={newPatient.lat.toFixed(4)} readOnly className="h-8 text-xs bg-gray-100" />
+                      <Input value={newPatient.lng.toFixed(4)} readOnly className="h-8 text-xs bg-gray-100" />
+                    </div>
+                  </div>
+
+                  <Button type="submit" size="lg" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md">
+                    <Navigation className="mr-2 h-4 w-4" />
+                    Predict Needs & Route Unit
+                  </Button>
+                </>
+              )}
             </form>
 
             <div className="mt-8">
@@ -1576,13 +1699,7 @@ export default function App() {
 
         {/* Action Buttons */}
         <div className="flex items-center space-x-3 px-5 h-full border-l border-slate-800 bg-slate-900 shrink-0 z-20 shadow-[-10px_0_20px_rgba(15,23,42,1)]">
-          <Button 
-            className={`h-9 px-4 text-xs font-bold transition-all shadow-md active:scale-95 ${isChatOpen ? 'bg-indigo-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-indigo-400 border border-slate-700'}`}
-            onClick={() => setIsChatOpen(!isChatOpen)}
-          >
-            <Bot className="w-4 h-4 mr-1.5" /> 
-            AI ASSISTANT
-          </Button>
+          <div className="text-xs text-slate-500 font-medium font-mono uppercase tracking-[0.2em] px-2">V1.0.4-PROTO</div>
         </div>
       </footer>
 
@@ -1672,7 +1789,7 @@ export default function App() {
             className={`fixed flex flex-col bg-white shadow-[0_10px_40px_rgba(0,0,0,0.25)] border border-slate-200 z-[1000] overflow-hidden transition-all duration-300 ${
               isExpanded 
                 ? 'inset-4 rounded-3xl' 
-                : 'bottom-20 right-6 w-96 max-h-[500px] rounded-2xl'
+                : 'bottom-20 right-6 w-96 max-h-[550px] rounded-2xl'
             }`}
           >
             {/* Header */}
@@ -1754,6 +1871,39 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* Persistent Floating Chat Trigger */}
+      <AnimatePresence>
+        {!isChatOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.5, y: 20 }}
+            className="fixed bottom-6 right-6 z-[999]"
+          >
+            <Button
+              onClick={() => {
+                setIsChatOpen(true);
+                // Give a friendly voice greeting when first opening
+                if (chatMessages.length <= 1) {
+                  speak("Hello, I am the Ignisia Assistant. How can I help you with emergency coordination today?");
+                }
+              }}
+              className="w-16 h-16 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-[0_8px_30px_rgba(79,70,229,0.4)] flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-90"
+            >
+              <div className="relative">
+                <Bot className="w-8 h-8" />
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                </span>
+              </div>
+            </Button>
+            <div className="absolute -top-12 right-0 bg-slate-900 text-white text-[10px] font-bold py-1 px-3 rounded-full whitespace-nowrap shadow-lg animate-bounce pointer-events-none uppercase tracking-widest">
+              AI Dispatch Live
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

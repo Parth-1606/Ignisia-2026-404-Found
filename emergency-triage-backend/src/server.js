@@ -6,7 +6,7 @@ const redis = require('./db/redis');
 const { initWebSocket } = require('./websocket/broadcaster');
 const { startSimulation, stopSimulation } = require('./services/simulationEngine');
 
-const PORT = parseInt(process.env.PORT) || 3000;
+const PORT = parseInt(process.env.PORT) || 3001;
 
 const startServer = async () => {
   console.log('\n========================================');
