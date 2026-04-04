@@ -103,16 +103,16 @@ const Sidebar = ({ currentView, setView }: { currentView: View, setView: (v: Vie
   ];
 
   return (
-    <div className="w-64 h-screen border-r border-white/5 flex flex-col p-6 fixed left-0 top-0 bg-dark-bg z-20">
+    <div className="w-64 h-screen border-r border-slate-200 flex flex-col p-6 fixed left-0 top-0 bg-white z-20 shadow-sm">
       <div className="flex items-center gap-3 mb-12 cursor-pointer" onClick={() => setView('landing')}>
-        <div className="w-10 h-10 rounded-xl bg-gold flex items-center justify-center shadow-[0_0_20px_rgba(255,215,0,0.3)]">
-          <Activity className="text-black w-6 h-6" />
+        <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg">
+          <Activity className="text-white w-6 h-6" />
         </div>
-        <span className="text-xl font-display font-bold tracking-tight text-gold">GoldenHour Dispatch</span>
+        <span className="text-xl font-display font-bold tracking-tight text-slate-900">GoldenHour Dispatch</span>
       </div>
 
       <div className="flex-1 flex flex-col gap-2">
-        <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-4 px-3">Main Menu</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 px-3">Main Menu</p>
         {menuItems.map((item, i) => (
           <button 
             key={i} 
@@ -122,7 +122,7 @@ const Sidebar = ({ currentView, setView }: { currentView: View, setView: (v: Vie
               }
             }}
             className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all group w-full text-left ${
-              currentView === item.id ? 'bg-gold/10 text-gold' : 'text-white/50 hover:text-white hover:bg-white/5'
+              currentView === item.id ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
             }`}
           >
             <span className="group-hover:scale-110 transition-transform">{item.icon}</span>
@@ -144,7 +144,7 @@ const ActiveEmergencies = ({ emergencies }: { emergencies: Emergency[] }) => {
   ];
 
   return (
-    <div className="glass rounded-3xl p-6 h-full flex flex-col">
+    <div className="bg-white rounded-3xl p-6 h-full flex flex-col shadow-sm border border-slate-200">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-xl font-display font-bold">Active Emergencies List</h3>
         <div className="px-3 py-1 rounded-full bg-red-500/10 text-red-400 text-[10px] font-bold uppercase animate-pulse">
@@ -159,10 +159,10 @@ const ActiveEmergencies = ({ emergencies }: { emergencies: Emergency[] }) => {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.1 }}
-            className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-all group cursor-pointer"
+            className="p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition-all group cursor-pointer"
           >
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-bold text-white/80">{e.id}</span>
+              <span className="text-sm font-bold text-slate-800">{e.id}</span>
               <div className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
                 e.severity === 'Critical' ? 'bg-red-500/20 text-red-400' : 'bg-orange-500/20 text-orange-400'
               }`}>
@@ -171,11 +171,11 @@ const ActiveEmergencies = ({ emergencies }: { emergencies: Emergency[] }) => {
             </div>
             
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-white/40">
+              <div className="flex items-center gap-2 text-slate-400">
                 <MapPin className="w-3 h-3" />
                 <span className="text-xs">{e.location}</span>
               </div>
-              <div className="flex items-center gap-2 text-gold">
+              <div className="flex items-center gap-2 text-blue-600">
                 <Clock className="w-3 h-3" />
                 <span className="text-xs font-mono font-bold">{e.time}</span>
               </div>
@@ -209,7 +209,7 @@ const RecommendedHospital = ({ emergency }: { emergency: Emergency | null }) => 
   } : defaultRec;
 
   return (
-    <div className="glass rounded-3xl p-8 gold-glow border-gold/10">
+    <div className="glass rounded-3xl p-8 gold-glow border-blue-100">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-12 h-12 rounded-2xl bg-gold/10 flex items-center justify-center text-gold">
           <CheckCircle2 className="w-6 h-6" />
@@ -223,27 +223,27 @@ const RecommendedHospital = ({ emergency }: { emergency: Emergency | null }) => 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="space-y-6">
           <div>
-            <p className="text-[10px] text-white/30 font-bold uppercase mb-1">Hospital Name</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Hospital Name</p>
             <p className="text-2xl font-bold">{rec.hospitalName}</p>
           </div>
           
           <div className="flex gap-12">
             <div>
-              <p className="text-[10px] text-white/30 font-bold uppercase mb-1">ETA</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">ETA</p>
               <p className="text-2xl font-bold text-gold">{rec.eta}</p>
             </div>
             <div>
-              <p className="text-[10px] text-white/30 font-bold uppercase mb-1">Match Score</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Match Score</p>
               <p className="text-2xl font-bold">{rec.matchScore}%</p>
             </div>
           </div>
         </div>
 
-        <div className="p-6 rounded-2xl bg-white/5 border border-white/5">
-          <p className="text-[10px] text-white/30 font-bold uppercase mb-3">Reason for Recommendation</p>
+        <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200">
+          <p className="text-[10px] text-slate-400 font-bold uppercase mb-3">Reason for Recommendation</p>
           <ul className="space-y-3">
             {rec.reasons.map((reason, i) => (
-              <li key={i} className="flex items-center gap-2 text-sm text-white/70">
+              <li key={i} className="flex items-center gap-2 text-sm text-slate-600">
                 <div className="w-1 h-1 rounded-full bg-gold" />
                 {reason}
               </li>
@@ -280,7 +280,7 @@ const MiniMapPreview = ({ emergencies }: { emergencies: Emergency[] }) => {
         }} />
       </div>
 
-      <div className="relative h-full w-full bg-black/20 rounded-3xl border border-white/5 overflow-hidden">
+      <div className="relative h-full w-full bg-slate-50 rounded-3xl border border-slate-200 overflow-hidden">
         {/* Radar Effect */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,215,0,0.05)_0%,transparent_70%)]" />
         
@@ -289,7 +289,7 @@ const MiniMapPreview = ({ emergencies }: { emergencies: Emergency[] }) => {
             <motion.line 
               x1={`${pLoc.x}%`} y1={`${pLoc.y}%`} 
               x2={`${hLoc.x}%`} y2={`${hLoc.y}%`}
-              stroke="gold" strokeWidth="1" strokeDasharray="4 4"
+              stroke="#2563eb" strokeWidth="1" strokeDasharray="4 4"
               initial={{ pathLength: 0, opacity: 0 }}
               animate={{ pathLength: 1, opacity: 0.3 }}
               transition={{ duration: 2, repeat: Infinity }}
@@ -311,7 +311,7 @@ const MiniMapPreview = ({ emergencies }: { emergencies: Emergency[] }) => {
         {activeEmergency && (
           <motion.div 
             whileHover={{ scale: 1.1 }}
-            className="absolute p-1.5 rounded-lg bg-gold text-black shadow-lg z-20"
+            className="absolute p-1.5 rounded-lg bg-gold text-slate-900 shadow-lg z-20"
             style={{ left: `${hLoc.x}%`, top: `${hLoc.y}%`, transform: 'translate(-50%, -50%)' }}
           >
             <Hospital className="w-3 h-3" />
@@ -321,7 +321,7 @@ const MiniMapPreview = ({ emergencies }: { emergencies: Emergency[] }) => {
         <div className="absolute inset-0 opacity-10 pointer-events-none">
           <div className="absolute inset-0 grid grid-cols-12 grid-rows-12">
             {Array.from({ length: 144 }).map((_, i) => (
-              <div key={i} className="border-[0.5px] border-gold/10" />
+              <div key={i} className="border-[0.5px] border-blue-100" />
             ))}
           </div>
           <motion.div 
@@ -346,14 +346,14 @@ const MiniMapPreview = ({ emergencies }: { emergencies: Emergency[] }) => {
             <div className="flex items-center justify-between p-3 glass rounded-xl text-[10px]">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-red-500" />
-                <span className="text-white/60">Patient {activeEmergency.id}</span>
+                <span className="text-slate-600">Patient {activeEmergency.id}</span>
               </div>
               <span className="font-bold">{activeEmergency.location}</span>
             </div>
             <div className="flex items-center justify-between p-3 glass rounded-xl text-[10px]">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-gold" />
-                <span className="text-white/60">Assigned: {activeEmergency.hospitalName}</span>
+                <span className="text-slate-600">Assigned: {activeEmergency.hospitalName}</span>
               </div>
               <span className="font-bold text-gold">{activeEmergency.eta || 'EN ROUTE'}</span>
             </div>
@@ -392,13 +392,13 @@ const HospitalsView = ({ hospitals: displayHospitals, onRefresh, isRefreshing }:
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-4xl font-display font-bold mb-2">Nearby Hospitals</h2>
-          <p className="text-white/40">Top facilities by proximity—ready to wire to live capacity APIs.</p>
+          <p className="text-slate-500">Top facilities by proximity—ready to wire to live capacity APIs.</p>
         </div>
         <div className="flex items-center gap-4">
           <button 
             onClick={onRefresh}
             disabled={isRefreshing}
-            className={`px-6 py-3 glass rounded-2xl flex items-center gap-2 text-sm font-bold transition-all ${isRefreshing ? 'opacity-50 cursor-wait' : 'hover:bg-white/5'}`}
+            className={`px-6 py-3 glass rounded-2xl flex items-center gap-2 text-sm font-bold transition-all ${isRefreshing ? 'opacity-50 cursor-wait' : 'hover:bg-slate-50'}`}
           >
             <RotateCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             {isRefreshing ? 'Syncing...' : 'Refresh'}
@@ -407,7 +407,7 @@ const HospitalsView = ({ hospitals: displayHospitals, onRefresh, isRefreshing }:
           <div className="relative">
             <button 
               onClick={() => setIsSortOpen(!isSortOpen)}
-              className="px-6 py-3 glass rounded-2xl flex items-center gap-2 text-sm font-bold hover:bg-white/5 transition-all min-w-[200px] justify-between"
+              className="px-6 py-3 glass rounded-2xl flex items-center gap-2 text-sm font-bold hover:bg-slate-50 transition-all min-w-[200px] justify-between"
             >
               {sortOptions.find(o => o.id === sortBy)?.label}
               <ChevronDown className={`w-4 h-4 transition-transform ${isSortOpen ? 'rotate-180' : ''}`} />
@@ -431,7 +431,7 @@ const HospitalsView = ({ hospitals: displayHospitals, onRefresh, isRefreshing }:
                       className={`w-full text-left px-4 py-3 text-sm font-medium transition-colors ${
                         sortBy === option.id 
                           ? 'bg-[#1a73e8] text-white' 
-                          : 'text-black hover:bg-gray-100'
+                          : 'text-slate-900 hover:bg-gray-100'
                       }`}
                     >
                       {option.label}
@@ -461,32 +461,32 @@ const HospitalsView = ({ hospitals: displayHospitals, onRefresh, isRefreshing }:
                 </div>
                 <div>
                   <h4 className="text-xl font-bold leading-tight">{h.name}</h4>
-                  <p className="text-xs text-white/40 mt-1">{h.address}</p>
+                  <p className="text-xs text-slate-500 mt-1">{h.address}</p>
                 </div>
               </div>
             </div>
 
             <div className="space-y-4 mb-8">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-white/40 font-medium">Distance:</span>
+                <span className="text-slate-500 font-medium">Distance:</span>
                 <span className="font-bold">{h.distance}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-white/40 font-medium">Drive Time:</span>
+                <span className="text-slate-500 font-medium">Drive Time:</span>
                 <span className="font-bold">{h.driveTime}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-white/40 font-medium">Wait Time:</span>
+                <span className="text-slate-500 font-medium">Wait Time:</span>
                 <span className="font-bold">{h.waitTime}</span>
               </div>
             </div>
 
             <div className="mb-8">
               <div className="flex items-center justify-between text-sm mb-2">
-                <span className="text-white/40 font-medium">Available Beds:</span>
+                <span className="text-slate-500 font-medium">Available Beds:</span>
                 <span className="font-bold">{h.beds}</span>
               </div>
-              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+              <div className="h-2 bg-slate-50 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
                   animate={{ width: `${h.bedPercent}%` }}
@@ -499,12 +499,12 @@ const HospitalsView = ({ hospitals: displayHospitals, onRefresh, isRefreshing }:
             <div className="grid grid-cols-2 gap-4 mt-auto">
               <button 
                 onClick={() => handleViewRoute(h)}
-                className="flex items-center justify-center gap-2 py-3 rounded-xl bg-gold text-black font-bold text-sm hover:bg-gold/90 transition-all active:scale-95"
+                className="flex items-center justify-center gap-2 py-3 rounded-xl bg-gold text-slate-900 font-bold text-sm hover:bg-gold/90 transition-all active:scale-95"
               >
                 <Navigation className="w-4 h-4" />
                 View Route
               </button>
-              <button className="flex items-center justify-center gap-2 py-3 rounded-xl glass hover:bg-white/5 transition-all text-sm font-bold">
+              <button className="flex items-center justify-center gap-2 py-3 rounded-xl glass hover:bg-slate-50 transition-all text-sm font-bold">
                 <Phone className="w-4 h-4" />
                 Call
               </button>
@@ -534,7 +534,7 @@ const SettingsView = ({ user, onUpdateUser }: { user: User | null, onUpdateUser:
           <input 
             type="text" 
             placeholder="Search settings..." 
-            className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm focus:outline-none focus:border-gold/30"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-gold/30"
           />
         </div>
         
@@ -544,8 +544,8 @@ const SettingsView = ({ user, onUpdateUser }: { user: User | null, onUpdateUser:
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
               activeTab === tab.id 
-                ? 'bg-white/10 text-white' 
-                : 'text-white/40 hover:text-white hover:bg-white/5'
+                ? 'bg-slate-100/50 text-white' 
+                : 'text-slate-500 hover:text-white hover:bg-slate-50'
             }`}
           >
             {tab.icon}
@@ -561,28 +561,28 @@ const SettingsView = ({ user, onUpdateUser }: { user: User | null, onUpdateUser:
         {activeTab === 'general' && (
           <div className="space-y-8">
             <section>
-              <h4 className="text-sm font-bold text-white/30 uppercase tracking-widest mb-4">Account Profile</h4>
-              <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+              <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Account Profile</h4>
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full bg-gold/20 flex items-center justify-center text-gold font-bold">
                     {user?.initials || '??'}
                   </div>
                   <div>
                     <p className="font-bold">{user?.name || 'Guest User'}</p>
-                    <p className="text-xs text-white/40">{user?.email || 'Please log in to see details'}</p>
+                    <p className="text-xs text-slate-500">{user?.email || 'Please log in to see details'}</p>
                   </div>
                 </div>
-                <button className="px-4 py-2 glass rounded-xl text-xs font-bold hover:bg-white/5 transition-all flex items-center gap-2">
+                <button className="px-4 py-2 glass rounded-xl text-xs font-bold hover:bg-slate-50 transition-all flex items-center gap-2">
                   Edit Profile <ExternalLink className="w-3 h-3" />
                 </button>
               </div>
             </section>
 
             <section>
-              <h4 className="text-sm font-bold text-white/30 uppercase tracking-widest mb-4">Personal Information</h4>
+              <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Personal Information</h4>
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-white/5 rounded-2xl border border-white/5 group hover:border-gold/30 transition-all">
-                  <p className="text-[10px] text-white/30 font-bold uppercase mb-1">Age</p>
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 group hover:border-gold/30 transition-all">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Age</p>
                   <input 
                     type="text" 
                     value={user?.age || '24 Years'} 
@@ -590,8 +590,8 @@ const SettingsView = ({ user, onUpdateUser }: { user: User | null, onUpdateUser:
                     className="bg-transparent font-bold text-white border-none focus:outline-none w-full" 
                   />
                 </div>
-                <div className="p-4 bg-white/5 rounded-2xl border border-white/5 group hover:border-gold/30 transition-all">
-                  <p className="text-[10px] text-white/30 font-bold uppercase mb-1">Blood Group</p>
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 group hover:border-gold/30 transition-all">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Blood Group</p>
                   <input 
                     type="text" 
                     value={user?.bloodGroup || 'O Positive'} 
@@ -603,17 +603,17 @@ const SettingsView = ({ user, onUpdateUser }: { user: User | null, onUpdateUser:
             </section>
 
             <section>
-              <h4 className="text-sm font-bold text-white/30 uppercase tracking-widest mb-4">Preferences</h4>
+              <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Preferences</h4>
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
                   <div>
                     <p className="font-bold text-sm">Sync layouts across windows</p>
-                    <p className="text-xs text-white/40">When enabled, all windows share the same layout</p>
+                    <p className="text-xs text-slate-500">When enabled, all windows share the same layout</p>
                   </div>
                   <div 
                     onClick={() => onUpdateUser({ syncLayouts: !user?.syncLayouts })}
                     className={`w-12 h-6 rounded-full relative cursor-pointer transition-colors ${
-                      user?.syncLayouts ? 'bg-gold' : 'bg-white/10'
+                      user?.syncLayouts ? 'bg-gold' : 'bg-slate-100/50'
                     }`}
                   >
                     <motion.div 
@@ -623,15 +623,15 @@ const SettingsView = ({ user, onUpdateUser }: { user: User | null, onUpdateUser:
                     />
                   </div>
                 </div>
-                <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
                   <div>
                     <p className="font-bold text-sm">Status Bar</p>
-                    <p className="text-xs text-white/40">Show real-time status bar in dashboard</p>
+                    <p className="text-xs text-slate-500">Show real-time status bar in dashboard</p>
                   </div>
                   <div 
                     onClick={() => onUpdateUser({ showStatusBar: !user?.showStatusBar })}
                     className={`w-12 h-6 rounded-full relative cursor-pointer transition-colors ${
-                      user?.showStatusBar ? 'bg-gold' : 'bg-white/10'
+                      user?.showStatusBar ? 'bg-gold' : 'bg-slate-100/50'
                     }`}
                   >
                     <motion.div 
@@ -649,24 +649,24 @@ const SettingsView = ({ user, onUpdateUser }: { user: User | null, onUpdateUser:
         {activeTab === 'medical' && (
           <div className="space-y-8">
             <section>
-              <h4 className="text-sm font-bold text-white/30 uppercase tracking-widest mb-4">Past Hospitals Visited</h4>
+              <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Past Hospitals Visited</h4>
               <div className="space-y-4">
                 {[
                   { name: "SSG Hospital", date: "Mar 12, 2026", reason: "Routine Checkup" },
                   { name: "Sterling Hospital", date: "Jan 05, 2026", reason: "Emergency - Fracture" },
                   { name: "Apollo Hospital", date: "Nov 22, 2025", reason: "Consultation" }
                 ].map((h, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                  <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/60">
+                      <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600">
                         <Building2 className="w-5 h-5" />
                       </div>
                       <div>
                         <p className="font-bold text-sm">{h.name}</p>
-                        <p className="text-xs text-white/40">{h.reason}</p>
+                        <p className="text-xs text-slate-500">{h.reason}</p>
                       </div>
                     </div>
-                    <p className="text-xs font-mono text-white/30">{h.date}</p>
+                    <p className="text-xs font-mono text-slate-400">{h.date}</p>
                   </div>
                 ))}
               </div>
@@ -688,18 +688,18 @@ const AboutView = () => (
   >
     <div className="text-center space-y-4">
       <h2 className="text-5xl font-display font-bold text-gold">Our Vision</h2>
-      <p className="text-white/40 text-lg">Revolutionizing emergency response through deep integration and real-time intelligence.</p>
+      <p className="text-slate-500 text-lg">Revolutionizing emergency response through deep integration and real-time intelligence.</p>
     </div>
 
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-      <div className="glass p-10 rounded-[40px] border-gold/10 gold-glow">
-        <p className="text-xl leading-relaxed text-white/80">
+      <div className="glass p-10 rounded-[40px] border-blue-100 gold-glow">
+        <p className="text-xl leading-relaxed text-slate-800">
           The GoldenHour Dispatch project was conceived to eliminate the critical delays in emergency triage that often cost lives. By seamlessly connecting vision-based accident classification with real-time hospital operational data, we've created a first-of-its-kind ecosystem where the right care is identified before the ambulance even reaches the scene.
         </p>
       </div>
 
-      <div className="glass p-10 rounded-[40px] border-gold/10 gold-glow">
-        <p className="text-xl leading-relaxed text-white/80">
+      <div className="glass p-10 rounded-[40px] border-blue-100 gold-glow">
+        <p className="text-xl leading-relaxed text-slate-800">
           In the healthcare sector, our system serves as a force multiplier for dispatchers and medical professionals alike. By automating the identification of trauma levels and providing instant, live updates on ICU bed availability and specialized unit status, we ensure that every critical patient is routed to the facility most capable of saving them, significantly reducing wait times and improving overall survival rates across the regional network.
         </p>
       </div>
@@ -714,6 +714,11 @@ const Hero = ({ setView }: { setView: (v: View) => void }) => {
   const [photo, setPhoto] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [traumaDetected, setTraumaDetected] = useState<boolean | null>(null);
+  const [sceneAnalysis, setSceneAnalysis] = useState<{
+    brief: string,
+    risks: string[],
+    impact: string
+  } | null>(null);
 
   const handleTriggerAlert = () => {
     setShowTriageForm(true);
@@ -729,19 +734,44 @@ const Hero = ({ setView }: { setView: (v: View) => void }) => {
       setTimeout(() => {
         setIsAnalyzing(false);
         setTraumaDetected(true);
+        setSceneAnalysis({
+          brief: "Multiple-vehicle collision detected with significant structural deformation. High-velocity impact indicators found.",
+          risks: ["Fuel Leakage Risk", "Entrapment Likely", "Low Visibility Zone"],
+          impact: "88/100 (Critical Kinetic Energy)"
+        });
       }, 2000);
     };
     reader.readAsDataURL(file);
   };
 
+  const [isDispatching, setIsDispatching] = useState(false);
+
   const handleFinalDispatch = () => {
-    const params = new URLSearchParams({
-      emergency: traumaDetected ? 'head' : 'manual_alert',
-      hr: vitals.hr.toString(),
-      bp: vitals.bp,
-      spo2: vitals.spo2.toString()
-    });
-    window.location.href = `http://localhost:5173?${params.toString()}`;
+    setIsDispatching(true);
+    
+    const triggerRedirect = (lat?: number, lng?: number) => {
+      const params = new URLSearchParams({
+        emergency: traumaDetected ? 'head' : 'manual_alert',
+        hr: vitals.hr.toString(),
+        bp: vitals.bp,
+        spo2: vitals.spo2.toString()
+      });
+      if (lat && lng) {
+        params.append('lat', lat.toString());
+        params.append('lng', lng.toString());
+      }
+      window.location.href = `http://localhost:5173?${params.toString()}`;
+    };
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => triggerRedirect(pos.coords.latitude, pos.coords.longitude),
+        () => triggerRedirect(), // Fallback if denied
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    } else {
+      triggerRedirect();
+    }
   };
 
   return (
@@ -757,7 +787,7 @@ const Hero = ({ setView }: { setView: (v: View) => void }) => {
             <div className="max-w-2xl w-full glass rounded-[40px] p-12 border-gold/20 text-left gold-glow overflow-y-auto max-h-[90vh]">
               <div className="flex items-center justify-between mb-8">
                 <h2 className="text-3xl font-display font-bold">Quick Triage Check</h2>
-                <button onClick={() => setShowTriageForm(false)} className="text-white/40 hover:text-white transition-colors">
+                <button onClick={() => setShowTriageForm(false)} className="text-slate-500 hover:text-white transition-colors">
                   <ArrowLeft className="w-6 h-6 rotate-90" />
                 </button>
               </div>
@@ -765,64 +795,94 @@ const Hero = ({ setView }: { setView: (v: View) => void }) => {
               <div className="space-y-6 mb-10">
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Heart Rate (BPM)</label>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Heart Rate (BPM)</label>
                     <input 
                       type="number" 
                       value={vitals.hr} 
                       onChange={(e) => setVitals(prev => ({ ...prev, hr: parseInt(e.target.value) }))}
-                      className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-xl font-bold focus:outline-none focus:border-gold/30 transition-all text-gold"
+                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-xl font-bold focus:outline-none focus:border-gold/30 transition-all text-gold"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Blood Pressure</label>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Blood Pressure</label>
                     <input 
                       type="text" 
                       value={vitals.bp} 
                       onChange={(e) => setVitals(prev => ({ ...prev, bp: e.target.value }))}
-                      className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-xl font-bold focus:outline-none focus:border-gold/30 transition-all text-gold"
+                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-xl font-bold focus:outline-none focus:border-gold/30 transition-all text-gold"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest">SpO2 Level (%)</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">SpO2 Level (%)</label>
                   <input 
                     type="number" 
                     value={vitals.spo2} 
                     onChange={(e) => setVitals(prev => ({ ...prev, spo2: parseInt(e.target.value) }))}
-                    className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-xl font-bold focus:outline-none focus:border-gold/30 transition-all text-gold"
+                    className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-xl font-bold focus:outline-none focus:border-gold/30 transition-all text-gold"
                   />
                 </div>
 
                 {/* Scene Photo Section */}
                 <div className="space-y-3">
-                  <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest block">Scene Photo Analysis</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Scene Photo Analysis</label>
                   {!photo ? (
-                    <label className="flex flex-col items-center justify-center gap-3 w-full h-32 bg-white/5 border-2 border-dashed border-white/10 rounded-2xl cursor-pointer hover:bg-white/10 transition-all group">
+                    <label className="flex flex-col items-center justify-center gap-3 w-full h-32 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-100/50 transition-all group">
                       <Smartphone className="w-8 h-8 text-white/20 group-hover:text-gold transition-colors" />
-                      <span className="text-xs font-bold text-white/40 tracking-wide">Upload Accident Photo for AI Scan</span>
+                      <span className="text-xs font-bold text-slate-500 tracking-wide">Upload Accident Photo for AI Scan</span>
                       <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} />
                     </label>
                   ) : (
-                    <div className="relative rounded-2xl overflow-hidden bg-white/5 border border-gold/20 p-2">
-                      <img src={photo} className="w-full h-40 object-cover rounded-xl opacity-60" />
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        {isAnalyzing ? (
-                          <div className="flex flex-col items-center gap-3">
-                            <div className="w-10 h-10 border-4 border-gold/20 border-t-gold rounded-full animate-spin" />
-                            <span className="text-sm font-bold text-gold animate-pulse tracking-widest">SCANNING...</span>
-                          </div>
-                        ) : traumaDetected && (
-                          <motion.div 
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="bg-red-500 text-white px-6 py-3 rounded-full font-black text-xs tracking-widest flex items-center gap-2 shadow-[0_0_30px_rgba(239,68,68,0.5)]"
-                          >
-                             <AlertTriangle className="w-4 h-4" />
-                             LEVEL 1 TRAUMA DETECTED
-                          </motion.div>
-                        )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="relative rounded-2xl overflow-hidden bg-slate-50 border border-gold/20 p-2">
+                        <img src={photo} className="w-full h-48 object-cover rounded-xl" />
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/20">
+                          {isAnalyzing ? (
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="w-10 h-10 border-4 border-gold/20 border-t-gold rounded-full animate-spin" />
+                              <span className="text-sm font-bold text-gold animate-pulse tracking-widest">SCANNING...</span>
+                            </div>
+                          ) : traumaDetected && (
+                            <motion.div 
+                              initial={{ scale: 0.8, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              className="bg-red-500 text-white px-4 py-2 rounded-full font-black text-[10px] tracking-widest flex items-center gap-2 shadow-lg"
+                            >
+                               <AlertTriangle className="w-3 h-3" />
+                               TRAUMA DETECTED
+                            </motion.div>
+                          )}
+                        </div>
                       </div>
+                      
+                      {sceneAnalysis && !isAnalyzing && (
+                        <motion.div 
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="bg-slate-900 border border-white/10 p-5 rounded-2xl flex flex-col justify-center"
+                        >
+                          <div className="flex items-center gap-3 mb-4">
+                             <div className="w-8 h-8 rounded-lg bg-gold/10 flex items-center justify-center text-gold">
+                                <Zap className="w-4 h-4" />
+                             </div>
+                             <p className="text-[10px] font-bold text-gold uppercase tracking-widest">AI Observation Brief</p>
+                          </div>
+                          
+                          <p className="text-white text-xs leading-relaxed mb-4 font-medium">{sceneAnalysis.brief}</p>
+                          
+                          <div className="flex flex-wrap gap-2 mb-4">
+                            {sceneAnalysis.risks.map((r, i) => (
+                              <span key={i} className="px-2 py-1 bg-red-500/10 text-red-400 text-[8px] font-bold rounded-lg border border-red-500/20">{r}</span>
+                            ))}
+                          </div>
+                          
+                          <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between">
+                            <span className="text-[9px] text-white/40 font-bold uppercase">Localized Impact</span>
+                            <span className="text-gold font-bold text-xs">{sceneAnalysis.impact}</span>
+                          </div>
+                        </motion.div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -830,11 +890,20 @@ const Hero = ({ setView }: { setView: (v: View) => void }) => {
 
               <button 
                 onClick={handleFinalDispatch}
-                disabled={isAnalyzing}
-                className={`w-full py-5 bg-gold text-black font-black rounded-[24px] transition-all flex items-center justify-center gap-3 text-lg shadow-[0_0_40px_rgba(255,215,0,0.2)] ${isAnalyzing ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'}`}
+                disabled={isAnalyzing || isDispatching}
+                className={`w-full py-5 bg-gold text-slate-900 font-black rounded-[24px] transition-all flex items-center justify-center gap-3 text-lg shadow-[0_0_40px_rgba(255,215,0,0.2)] ${isAnalyzing || isDispatching ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'}`}
               >
-                <Zap className="w-6 h-6 fill-black" />
-                Initialize Tactical Dispatch
+                {isDispatching ? (
+                  <>
+                    <div className="w-5 h-5 border-4 border-slate-900/20 border-t-slate-900 rounded-full animate-spin" />
+                    Acquiring GPS Signal...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-6 h-6 fill-black" />
+                    Initialize Tactical Dispatch
+                  </>
+                )}
               </button>
             </div>
           </motion.div>
@@ -863,7 +932,7 @@ const Hero = ({ setView }: { setView: (v: View) => void }) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="text-xl text-white/40 max-w-2xl mb-12 leading-relaxed"
+        className="text-xl text-slate-500 max-w-2xl mb-12 leading-relaxed"
       >
         GoldenHour Dispatch uses advanced AI to detect accidents and route ambulances in real-time. 
         Saving lives through precision and speed.
@@ -877,13 +946,13 @@ const Hero = ({ setView }: { setView: (v: View) => void }) => {
       >
         <button 
           onClick={handleTriggerAlert}
-          className="px-8 py-4 bg-gold text-black font-bold rounded-2xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(255,215,0,0.3)]"
+          className="px-8 py-4 bg-red-600 text-white font-black rounded-2xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(220,38,38,0.5)] animate-pulse"
         >
-          Trigger Alert
+          TRIGGER SOS
         </button>
         <button 
           onClick={() => setView('manual')}
-          className="px-8 py-4 glass rounded-2xl font-bold hover:bg-white/5 transition-all"
+          className="px-8 py-4 glass rounded-2xl font-bold hover:bg-slate-50 transition-all"
         >
           Manual
         </button>
@@ -909,13 +978,13 @@ const Features = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: i * 0.1 }}
-          className="p-8 glass rounded-3xl border-white/5 hover:border-gold/20 transition-all group"
+          className="p-8 glass rounded-3xl border-slate-200 hover:border-gold/20 transition-all group"
         >
           <div className="w-12 h-12 rounded-2xl bg-gold/10 flex items-center justify-center text-gold mb-6 group-hover:scale-110 transition-transform">
             {f.icon}
           </div>
           <h4 className="text-xl font-bold mb-3">{f.title}</h4>
-          <p className="text-sm text-white/40 leading-relaxed">{f.desc}</p>
+          <p className="text-sm text-slate-500 leading-relaxed">{f.desc}</p>
         </motion.div>
       ))}
     </div>
@@ -932,11 +1001,11 @@ const AmbulanceStatusCards = () => {
   return (
     <div className="py-20 grid grid-cols-1 md:grid-cols-3 gap-8">
       {statuses.map((s, i) => (
-        <div key={i} className="p-8 glass rounded-3xl border-white/5">
+        <div key={i} className="p-8 glass rounded-3xl border-slate-200">
           <div className={`w-12 h-12 rounded-2xl ${s.bg} flex items-center justify-center ${s.color} mb-6`}>
             <Ambulance className="w-6 h-6" />
           </div>
-          <p className="text-sm text-white/40 font-bold uppercase tracking-widest mb-1">{s.label}</p>
+          <p className="text-sm text-slate-500 font-bold uppercase tracking-widest mb-1">{s.label}</p>
           <p className="text-4xl font-bold">{s.count}</p>
           <div className="mt-4 flex items-center gap-2 text-xs text-white/20">
             <Clock className="w-3 h-3" />
@@ -990,13 +1059,13 @@ const UserRolesView = () => {
 
   const InputField = ({ label, placeholder, type = "text", value, onChange }: { label: string, placeholder: string, type?: string, value: string, onChange: (val: string) => void }) => (
     <div className="space-y-2">
-      <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest">{label}</label>
+      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</label>
       <input 
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm focus:outline-none focus:border-gold/30 transition-all"
+        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-gold/30 transition-all"
       />
     </div>
   );
@@ -1005,14 +1074,14 @@ const UserRolesView = () => {
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
       <div className="mb-10">
         <h2 className="text-4xl font-display font-bold mb-2">User Roles & Incident Reporting</h2>
-        <p className="text-white/40">Capture critical data for emergency response and hospital coordination.</p>
+        <p className="text-slate-500">Capture critical data for emergency response and hospital coordination.</p>
       </div>
 
       {/* Incident Report (ETM) */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass rounded-[32px] p-8 border-white/5 relative overflow-hidden"
+        className="glass rounded-[32px] p-8 border-slate-200 relative overflow-hidden"
       >
         <div className="flex items-center gap-4 mb-8">
           <div className="w-12 h-12 rounded-2xl bg-gold/10 flex items-center justify-center text-gold">
@@ -1036,12 +1105,12 @@ const UserRolesView = () => {
             onChange={(val) => handleInputChange('timeReported', val)}
           />
           <div className="md:col-span-2 space-y-2">
-            <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Incident Description</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Incident Description</label>
             <textarea 
               placeholder="What actually happened to the injured person?"
               value={formData.incidentDescription}
               onChange={(e) => handleInputChange('incidentDescription', e.target.value)}
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm focus:outline-none focus:border-gold/30 transition-all h-32 resize-none"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-gold/30 transition-all h-32 resize-none"
             />
           </div>
         </div>
@@ -1052,7 +1121,7 @@ const UserRolesView = () => {
 
         <button 
           onClick={() => handleSubmit('incident', ['hospitalPerson', 'timeReported', 'incidentDescription'])}
-          className="w-full py-4 bg-gold text-black font-bold rounded-2xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+          className="w-full py-4 bg-gold text-slate-900 font-bold rounded-2xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
         >
           {submitted.incident ? (
             <>
@@ -1068,7 +1137,7 @@ const UserRolesView = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="glass rounded-[32px] p-8 border-white/5"
+        className="glass rounded-[32px] p-8 border-slate-200"
       >
         <div className="flex items-center gap-4 mb-8">
           <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400">
@@ -1105,12 +1174,12 @@ const UserRolesView = () => {
             onChange={(val) => handleInputChange('personConditions', val)}
           />
           <div className="md:col-span-2 space-y-2">
-            <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Address</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Address</label>
             <textarea 
               placeholder="Enter full address"
               value={formData.personAddress}
               onChange={(e) => handleInputChange('personAddress', e.target.value)}
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm focus:outline-none focus:border-gold/30 transition-all h-24 resize-none"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-gold/30 transition-all h-24 resize-none"
             />
           </div>
         </div>
@@ -1137,7 +1206,7 @@ const UserRolesView = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="glass rounded-[32px] p-8 border-white/5"
+        className="glass rounded-[32px] p-8 border-slate-200"
       >
         <div className="flex items-center gap-4 mb-8">
           <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-400">
@@ -1426,7 +1495,7 @@ const ManualView = () => {
                 <MapPin className="w-12 h-12" />
               </motion.div>
               <h2 className="text-4xl font-display font-bold mb-4">Enable Location</h2>
-              <p className="text-xl text-white/60 mb-8 leading-relaxed">
+              <p className="text-xl text-slate-600 mb-8 leading-relaxed">
                 We need your GPS coordinates to dispatch the nearest ambulance immediately. 
                 Please ensure location services are enabled on your device.
               </p>
@@ -1454,12 +1523,12 @@ const ManualView = () => {
             className="grid grid-cols-1 md:grid-cols-2 gap-6"
           >
             <div className="md:col-span-2 mb-4">
-              <h3 className="text-xl font-bold text-white/60">What happened? Select a situation:</h3>
+              <h3 className="text-xl font-bold text-slate-600">What happened? Select a situation:</h3>
             </div>
             {guides.map((guide) => (
               <div
                 key={guide.id}
-                className="glass rounded-[32px] p-8 border-white/5 hover:border-gold/20 transition-all group relative overflow-hidden flex items-center gap-6"
+                className="glass rounded-[32px] p-8 border-slate-200 hover:border-gold/20 transition-all group relative overflow-hidden flex items-center gap-6"
               >
                 {/* Information Layer */}
                 <div className="flex items-center gap-6 w-full group-hover:opacity-10 transition-opacity duration-300">
@@ -1468,7 +1537,7 @@ const ManualView = () => {
                   </div>
                   <div>
                     <h4 className="text-xl font-bold mb-1">{guide.title.en}</h4>
-                    <p className="text-sm text-white/40">Hover for options</p>
+                    <p className="text-sm text-slate-500">Hover for options</p>
                   </div>
                 </div>
 
@@ -1476,14 +1545,14 @@ const ManualView = () => {
                 <div className="absolute inset-0 bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center justify-center gap-4 p-6 translate-y-4 group-hover:translate-y-0">
                   <button 
                     onClick={() => setSelectedId(guide.id)}
-                    className="w-full py-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-sm font-bold transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-slate-100/50 hover:bg-white/20 border border-slate-200 rounded-2xl text-sm font-bold transition-all flex items-center justify-center gap-2"
                   >
                     <BookOpen className="w-4 h-4" />
                     Read Manual
                   </button>
                   <button 
                     onClick={() => handleServicesClick(guide.id)}
-                    className="w-full py-3 bg-gold text-black rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2 hover:scale-[1.02]"
+                    className="w-full py-3 bg-gold text-slate-900 rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2 hover:scale-[1.02]"
                   >
                     <Phone className="w-4 h-4" />
                     Emergency Services
@@ -1510,11 +1579,11 @@ const ManualView = () => {
               </button>
 
               <div className="flex items-center gap-3 glass p-2 rounded-2xl">
-                <span className="text-xs font-bold text-white/40 uppercase tracking-widest px-3">Select Language</span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest px-3">Select Language</span>
                 <select 
                   value={lang}
                   onChange={(e) => setLang(e.target.value as any)}
-                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-gold/30 transition-all cursor-pointer"
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-gold/30 transition-all cursor-pointer"
                 >
                   <option value="en" className="bg-dark-bg">🇬🇧 English</option>
                   <option value="hi" className="bg-dark-bg">🇮🇳 Hindi</option>
@@ -1527,7 +1596,7 @@ const ManualView = () => {
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="glass rounded-[40px] p-10 border-white/5 gold-glow"
+                className="glass rounded-[40px] p-10 border-slate-200 gold-glow"
               >
                 <div className="flex items-center gap-6 mb-10">
                   <div className={`w-20 h-20 rounded-[28px] ${selectedGuide.bg} flex items-center justify-center ${selectedGuide.color}`}>
@@ -1543,7 +1612,7 @@ const ManualView = () => {
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: sIdx * 0.05 }}
-                      className="flex items-start gap-6 p-6 rounded-3xl bg-white/5 border border-white/5"
+                      className="flex items-start gap-6 p-6 rounded-3xl bg-slate-50 border border-slate-200"
                     >
                       <div className="w-10 h-10 rounded-2xl bg-gold/10 flex items-center justify-center text-gold font-bold shrink-0 border border-gold/20">
                         {sIdx + 1}
@@ -1563,7 +1632,7 @@ const ManualView = () => {
           <AlertTriangle className="w-6 h-6" />
           <h4 className="font-bold uppercase tracking-widest">Critical Warning</h4>
         </div>
-        <p className="text-white/60 text-sm leading-relaxed">
+        <p className="text-slate-600 text-sm leading-relaxed">
           This guide is for informational purposes only. In any emergency, your first action should always be to call professional emergency services. Do not attempt complex medical procedures if you are not trained.
         </p>
       </div>
@@ -1585,46 +1654,46 @@ const LoginModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: ()
         animate={{ opacity: 1, scale: 1, y: 0 }}
         className="glass w-[400px] rounded-[40px] p-10 border-gold/20 gold-glow relative"
       >
-        <button onClick={onClose} className="absolute right-6 top-6 text-white/40 hover:text-white">
+        <button onClick={onClose} className="absolute right-6 top-6 text-slate-500 hover:text-white">
           <ArrowLeft className="w-5 h-5 rotate-90" />
         </button>
 
         <h3 className="text-3xl font-display font-bold mb-2">{isSignUp ? 'Join GoldenHour Dispatch' : 'Welcome Back'}</h3>
-        <p className="text-sm text-white/40 mb-8 border-b border-white/10 pb-4">
+        <p className="text-sm text-slate-500 mb-8 border-b border-slate-200 pb-4">
           {isSignUp ? 'Create an account to start dispatching' : 'Access your professional dashboard'}
         </p>
 
         <div className="space-y-4">
           {isSignUp && (
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest pl-2">Full Name</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-2">Full Name</label>
               <input 
                 type="text" 
                 placeholder="John Doe"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-5 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-sm focus:outline-none focus:border-gold/30 transition-all font-medium"
+                className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:border-gold/30 transition-all font-medium"
               />
             </div>
           )}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest pl-2">Email Address</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-2">Email Address</label>
             <input 
               type="email" 
               placeholder="john@example.com"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-5 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-sm focus:outline-none focus:border-gold/30 transition-all font-medium"
+              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:border-gold/30 transition-all font-medium"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest pl-2">Password</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-2">Password</label>
             <input 
               type="password" 
               placeholder="••••••••"
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full px-5 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-sm focus:outline-none focus:border-gold/30 transition-all font-medium"
+              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:border-gold/30 transition-all font-medium"
             />
           </div>
         </div>
@@ -1643,12 +1712,12 @@ const LoginModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: ()
               showStatusBar: true
             });
           }}
-          className="w-full py-4 bg-gold text-black font-black rounded-2xl mt-8 hover:scale-[1.02] transition-all shadow-[0_0_20px_rgba(255,215,0,0.2)]"
+          className="w-full py-4 bg-gold text-slate-900 font-black rounded-2xl mt-8 hover:scale-[1.02] transition-all shadow-[0_0_20px_rgba(255,215,0,0.2)]"
         >
           {isSignUp ? 'Create Account' : 'Sign In'}
         </button>
 
-        <p className="text-center text-xs text-white/40 mt-6">
+        <p className="text-center text-xs text-slate-500 mt-6">
           {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
           <button onClick={() => setIsSignUp(!isSignUp)} className="text-gold font-bold hover:underline">
             {isSignUp ? 'Sign In' : 'Sign Up'}
@@ -1741,7 +1810,7 @@ export default function App() {
   );
 
   return (
-    <div className="flex min-h-screen bg-dark-bg text-white overflow-hidden">
+    <div className="flex min-h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
       <Sidebar currentView={view} setView={setView} />
       
       <main className="flex-1 ml-64 p-8 overflow-y-auto h-screen">
@@ -1749,10 +1818,10 @@ export default function App() {
         {view !== 'landing' && (
           <header className="flex items-center justify-between mb-10">
             <div>
-              <h1 className="text-3xl font-display font-bold mb-1 capitalize">
+              <h1 className="text-3xl font-display font-bold mb-1 capitalize text-slate-900">
                 {view}
               </h1>
-              <p className="text-white/40 text-sm">
+              <p className="text-slate-500 text-sm">
                 {currentUser ? `Welcome back, ${currentUser.name}` : 'Welcome to Golden Root Dispatch'}
               </p>
             </div>
@@ -1760,18 +1829,18 @@ export default function App() {
             <div className="flex items-center gap-4">
               {currentUser ? (
                 <div 
-                  className="h-12 px-2 flex items-center gap-3 glass rounded-2xl border border-gold/10 hover:border-gold/30 transition-all cursor-pointer group"
+                  className="h-12 px-2 flex items-center gap-3 bg-white shadow-sm rounded-2xl border border-slate-200 hover:border-blue-400 transition-all cursor-pointer group"
                   onClick={() => setView('settings')}
                 >
-                  <div className="w-8 h-8 rounded-xl bg-gold/20 flex items-center justify-center text-gold font-bold text-xs">
+                  <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
                     {currentUser.initials}
                   </div>
-                  <span className="text-sm font-bold pr-2 group-hover:text-gold transition-colors">{currentUser.name.split(' ')[0]}</span>
+                  <span className="text-sm font-bold pr-2 group-hover:text-blue-600 transition-colors text-slate-800">{currentUser.name.split(' ')[0]}</span>
                 </div>
               ) : (
                 <button 
                   onClick={() => setIsAuthModalOpen(true)}
-                  className="px-6 py-3 bg-gold text-black font-black rounded-2xl hover:scale-105 transition-transform shadow-[0_0_20px_rgba(255,215,0,0.2)] text-sm"
+                  className="px-6 py-3 bg-blue-600 text-white font-black rounded-2xl hover:scale-105 transition-transform shadow-lg text-sm"
                 >
                   Login / Sign Up
                 </button>
@@ -1792,32 +1861,32 @@ export default function App() {
               <Hero setView={setView} />
               <Features />
               <div className="py-20">
-                <div className="glass rounded-[40px] p-12 border-gold/10 gold-glow overflow-hidden relative">
+                <div className="bg-white rounded-[40px] p-12 border border-slate-200 shadow-xl overflow-hidden relative">
                   <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
                     <div className="lg:w-1/2">
-                      <h2 className="text-6xl font-display font-bold mb-6 leading-tight">Live Response <br /><span className="text-gold">Network</span></h2>
-                      <p className="text-xl text-white/40 mb-10 leading-relaxed max-w-lg">
+                      <h2 className="text-6xl font-display font-bold mb-6 leading-tight text-slate-900">Live Response <br /><span className="text-blue-600">Network</span></h2>
+                      <p className="text-xl text-slate-500 mb-10 leading-relaxed max-w-lg">
                         Our proprietary network connects every emergency asset in the city. 
                         Real-time data visualization allows for split-second decision making and instant hospital orchestration.
                       </p>
                       <div className="flex gap-4">
                         <button 
                           onClick={() => window.location.href = 'http://localhost:5173'}
-                          className="px-10 py-5 bg-gold text-black font-black rounded-2xl hover:scale-105 transition-all shadow-[0_0_40px_rgba(255,215,0,0.3)] flex items-center gap-3 group"
+                          className="px-10 py-5 bg-blue-600 text-white font-black rounded-2xl hover:scale-105 transition-all shadow-xl flex items-center gap-3 group"
                         >
                           <Ambulance className="w-5 h-5 group-hover:animate-bounce" />
                           Call Ambulance
                         </button>
                         <button 
                           onClick={() => setView('manual')}
-                          className="px-8 py-5 glass rounded-2xl font-bold hover:bg-white/5 transition-all text-sm uppercase tracking-widest text-white/60"
+                          className="px-8 py-5 bg-slate-100 rounded-2xl font-bold hover:bg-slate-200 transition-all text-sm uppercase tracking-widest text-slate-600"
                         >
                           Guide
                         </button>
                       </div>
                     </div>
                     <div 
-                      className="lg:w-1/2 h-[450px] rounded-[40px] bg-black/40 border border-white/5 overflow-hidden relative cursor-pointer group/map"
+                      className="lg:w-1/2 h-[450px] rounded-[40px] bg-slate-50 border border-slate-200 shadow-inner overflow-hidden relative cursor-pointer group/map"
                       onClick={() => window.location.href = 'http://localhost:5173'}
                     >
                       <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1526628953301-3e589a6a8b74?q=80&w=2006&auto=format&fit=crop')] bg-cover opacity-10 grayscale group-hover:opacity-20 transition-opacity" />
@@ -1826,16 +1895,16 @@ export default function App() {
                   </div>
                 </div>
               </div>
-              <footer className="py-20 border-t border-white/5">
+              <footer className="py-20 border-t border-slate-200">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-16">
                   <div className="space-y-6">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gold flex items-center justify-center text-black shadow-[0_0_20px_rgba(255,215,0,0.3)]">
+                      <div className="w-10 h-10 rounded-xl bg-gold flex items-center justify-center text-slate-900 shadow-lg shadow-blue-100/30">
                         <Activity className="w-6 h-6" />
                       </div>
                       <span className="text-2xl font-display font-bold text-gold tracking-tight">GoldenHour Dispatch</span>
                     </div>
-                    <p className="text-white/40 text-sm leading-relaxed italic">
+                    <p className="text-slate-500 text-sm leading-relaxed italic">
                       "Arogyam Dhansampada" — Health is the true wealth. We are committed to preserving it through speed and technology.
                     </p>
                   </div>
@@ -1843,15 +1912,15 @@ export default function App() {
                   <div className="space-y-6">
                     <h4 className="text-gold font-bold uppercase tracking-widest text-xs">Safety First</h4>
                     <ul className="space-y-4">
-                      <li className="flex items-start gap-3 text-sm text-white/60">
+                      <li className="flex items-start gap-3 text-sm text-slate-600">
                         <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />
                         <span>Don't drink and drive. Your life and others' are worth more than a glass.</span>
                       </li>
-                      <li className="flex items-start gap-3 text-sm text-white/60">
+                      <li className="flex items-start gap-3 text-sm text-slate-600">
                         <Shield className="w-5 h-5 text-gold shrink-0" />
                         <span>Speed thrills but kills. Better late than never.</span>
                       </li>
-                      <li className="flex items-start gap-3 text-sm text-white/60">
+                      <li className="flex items-start gap-3 text-sm text-slate-600">
                         <Smartphone className="w-5 h-5 text-blue-400 shrink-0" />
                         <span>Eyes on the road, not on the screen. Avoid distractions while driving.</span>
                       </li>
@@ -1860,8 +1929,8 @@ export default function App() {
 
                   <div className="space-y-6">
                     <h4 className="text-gold font-bold uppercase tracking-widest text-xs">Health Thoughts</h4>
-                    <div className="p-6 glass rounded-2xl border-gold/10">
-                      <p className="text-sm text-white/80 italic leading-relaxed">
+                    <div className="p-6 glass rounded-2xl border-blue-100">
+                      <p className="text-sm text-slate-800 italic leading-relaxed">
                         "The greatest of follies is to sacrifice health for any other kind of happiness."
                       </p>
                       <p className="text-[10px] text-gold font-bold mt-4 uppercase">— Arthur Schopenhauer</p>
@@ -1869,9 +1938,9 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
+                <div className="pt-8 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-6">
                   <p className="text-xs text-white/20">© 2026 GoldenHour Dispatch Emergency Systems. All rights reserved.</p>
-                  <div className="flex gap-8 text-xs text-white/40">
+                  <div className="flex gap-8 text-xs text-slate-500">
                     <a href="#" className="hover:text-gold transition-colors">Privacy Policy</a>
                     <a href="#" className="hover:text-gold transition-colors">Terms of Service</a>
                     <a href="#" className="hover:text-gold transition-colors">Contact Support</a>
@@ -1937,8 +2006,8 @@ export default function App() {
       </main>
 
       {/* Decorative Orbs */}
-      <div className="fixed top-[-20%] right-[-10%] w-[50%] h-[50%] bg-gold/5 blur-[150px] rounded-full pointer-events-none" />
-      <div className="fixed bottom-[-20%] left-[10%] w-[40%] h-[40%] bg-gold/5 blur-[150px] rounded-full pointer-events-none" />
+      <div className="fixed top-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-600/5 blur-[150px] rounded-full pointer-events-none" />
+      <div className="fixed bottom-[-20%] left-[10%] w-[40%] h-[40%] bg-blue-600/5 blur-[150px] rounded-full pointer-events-none" />
 
       <LoginModal 
         isOpen={isAuthModalOpen} 

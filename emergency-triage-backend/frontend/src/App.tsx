@@ -492,6 +492,10 @@ export default function App() {
               };
             } else {
               const targetHospital = hospitals.find(h => h.id === p.assignedHospitalId);
+              // Stop the Golden Hour timer when a critical patient reaches the destination
+              if (p.severity === 'Critical') {
+                setGoldenHourTimer(null);
+              }
               return {
                 ...p,
                 ambulanceLat: targetHospital?.lat || p.lat,
@@ -768,65 +772,74 @@ export default function App() {
   } | null>(null);
 
   const simulateRoadClosure = async () => {    
-    const newPatients = [];
-    let rerouteCount = 0;
+    // Identify en-route ambulances that can be reroute
+    const rerouteCandidates = patients.filter(p => p.currentRoutePhase === 'TO_HOSPITAL' && p.assignedHospitalId);
     
-    for (const p of patients) {
-      if (p.currentRoutePhase === 'TO_HOSPITAL' && p.assignedHospitalId) {
-         const oldHospitalName = hospitals.find(h => h.id === p.assignedHospitalId)?.name || 'Unknown Hospital';
-         const availableHospitals = hospitals.filter(h => h.id !== p.assignedHospitalId);
-         const validHospitals = p.severity === 'Critical' ? availableHospitals.filter(h => h.hasNeuro && h.hasCathLab) : availableHospitals;
-         
-         if (validHospitals.length > 0) {
-           // Find nearest alternative hospital from the ambulance's current location to simulate a mid-journey detour
-           let nearest = validHospitals[0];
-           let minDist = Infinity;
-           validHospitals.forEach(h => {
-             const dist = Math.pow(h.lat - p.ambulanceLat, 2) + Math.pow(h.lng - p.ambulanceLng, 2);
-             if (dist < minDist) { minDist = dist; nearest = h; }
-           });
-
-           const newRouteToHospital = await fetchRoute(
-             [p.ambulanceLat, p.ambulanceLng],
-             [nearest.lat, nearest.lng]
-           );
-
-           // Calculate midpoint of remaining route to place the roadblock marker
-           const remRoute = p.routeToHospital || [];
-           const blockIdx = Math.floor(remRoute.length / 3) + p.currentRouteIndex;
-           const blockPoint = remRoute[blockIdx] || [p.ambulanceLat + 0.01, p.ambulanceLng + 0.01];
-
-           if (rerouteCount === 0) {
-             setRoadblockLocation(blockPoint as [number, number]);
-             setMapCenter(blockPoint as [number, number]); // Focus map on the blockage
-             setRerouteAlert({
-               isOpen: true,
-               unitId: p.dispatchedUnit || 'Ambulance Unit',
-               previousHospital: oldHospitalName,
-               newHospital: nearest.name,
-               reason: 'Three major arterial roads closed ahead due to an emergency.',
-               pendingPatients: [] // We fill this later after loop
-             });
-           }
-
-           newPatients.push({
-             ...p,
-             assignedHospitalId: nearest.id,
-             routeToHospital: newRouteToHospital,
-             currentRouteIndex: 0,
-             routingRationale: `🚨 DYNAMIC DETOUR: Major arterial road closure ahead. Route recalculated to ${nearest.name}.`
-           });
-           rerouteCount++;
-           continue;
-         }
-      }
-      newPatients.push(p);
-    }
-    
-    if (rerouteCount > 0) {
-      setRerouteAlert(prev => prev ? { ...prev, pendingPatients: newPatients } : null);
-    } else {
+    if (rerouteCandidates.length === 0) {
       alert("No active ambulances are currently en-route to a hospital to demonstrate the detour.");
+      return;
+    }
+
+    try {
+      // Process all reroutes in parallel to minimize time complexity
+      const reroutedResults = await Promise.all(rerouteCandidates.map(async (p, idx) => {
+        const oldHospitalName = hospitals.find(h => h.id === p.assignedHospitalId)?.name || 'Unknown Hospital';
+        const availableHospitals = hospitals.filter(h => h.id !== p.assignedHospitalId);
+        const validHospitals = p.severity === 'Critical' ? availableHospitals.filter(h => h.hasNeuro && h.hasCathLab) : availableHospitals;
+        
+        if (validHospitals.length === 0) return { updatedPatient: { ...p }, alertData: null };
+
+        // Find nearest alternative
+        let nearest = validHospitals[0];
+        let minDist = Infinity;
+        validHospitals.forEach(h => {
+          const dist = Math.pow(h.lat - p.ambulanceLat, 2) + Math.pow(h.lng - p.ambulanceLng, 2);
+          if (dist < minDist) { minDist = dist; nearest = h; }
+        });
+
+        // Parallel network request for route
+        const newRouteToHospital = await fetchRoute(
+          [p.ambulanceLat, p.ambulanceLng],
+          [nearest.lat, nearest.lng]
+        );
+
+        // Reroute result
+        return {
+          updatedPatient: {
+            ...p,
+            assignedHospitalId: nearest.id,
+            routeToHospital: newRouteToHospital,
+            currentRouteIndex: 0,
+            routingRationale: `🚨 DYNAMIC DETOUR: Major arterial road closure ahead. Route recalculated to ${nearest.name}.`
+          },
+          alertData: idx === 0 ? {
+            unitId: p.dispatchedUnit || 'Ambulance Unit',
+            previousHospital: oldHospitalName,
+            newHospital: nearest.name,
+            blockPoint: (p.routeToHospital || [])[Math.floor((p.routeToHospital || []).length / 3) + p.currentRouteIndex] || [p.ambulanceLat + 0.005, p.ambulanceLng + 0.005]
+          } : null
+        };
+      }));
+
+      // Update state once for all patients
+      const updatedPatientsMap = new Map(reroutedResults.map(r => [r.updatedPatient.id, r.updatedPatient]));
+      const nextPatients = patients.map(p => updatedPatientsMap.get(p.id) || p);
+      
+      const primaryAlert = reroutedResults[0].alertData;
+      if (primaryAlert) {
+        setRoadblockLocation(primaryAlert.blockPoint as [number, number]);
+        setMapCenter(primaryAlert.blockPoint as [number, number]);
+        setRerouteAlert({
+          isOpen: true,
+          unitId: primaryAlert.unitId,
+          previousHospital: primaryAlert.previousHospital,
+          newHospital: primaryAlert.newHospital,
+          reason: 'Three major arterial roads closed ahead due to an emergency.',
+          pendingPatients: nextPatients
+        });
+      }
+    } catch (err) {
+      console.error("Rerouting optimization failed:", err);
     }
   };
 
@@ -1119,54 +1132,73 @@ export default function App() {
                   </Button>
                 ) : (
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 relative overflow-hidden group">
-                    {isScanningPhoto ? (
-                      <div className="flex flex-col items-center justify-center gap-3 p-4">
-                        <Scan className="h-8 w-8 text-blue-500 animate-pulse" />
-                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] animate-pulse">Running Neural Scan...</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-start gap-4">
-                        <div className="w-20 h-20 rounded-lg overflow-hidden relative shrink-0 border border-slate-200">
-                          <img src={scenePhoto} alt="scene" className="w-full h-full object-cover" />
-                          <div className={`absolute inset-0 border-[3px] rounded-lg ${visionAnalysis?.override ? 'border-red-500 animate-pulse' : 'border-emerald-500'}`}></div>
+                      {isScanningPhoto ? (
+                        <div className="flex flex-col items-center justify-center gap-3 p-6">
+                           <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
+                           <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest animate-pulse">Running Neural Scan...</span>
                         </div>
-                        <div className="flex-1 min-w-0 py-1">
-                          <div className="flex items-center gap-1.5 mb-2">
-                            {visionAnalysis?.override
-                               ? <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />
-                               : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
-                            <h4 className={`font-black text-[10px] uppercase tracking-widest ${visionAnalysis?.override ? 'text-red-500' : 'text-emerald-500'}`}>
-                              {visionAnalysis?.traumaLevel === 'LEVEL_1_TRAUMA' ? 'CRITICAL DETECTED' : 'STANDARD SCENE'}
-                            </h4>
+                      ) : (
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-start gap-4">
+                            <div className="w-24 h-24 rounded-lg overflow-hidden relative shrink-0 border border-slate-200 shadow-sm">
+                              <img src={scenePhoto} alt="scene" className="w-full h-full object-cover" />
+                              <div className={`absolute inset-0 border-[3px] rounded-lg ${visionAnalysis?.override ? 'border-red-500 shadow-[inset_0_0_10px_rgba(239,68,68,0.3)]' : 'border-emerald-500'}`}></div>
+                              <div className="absolute top-1 right-1">
+                                <button type="button" onClick={() => { setScenePhoto(null); setVisionAnalysis(null); }} className="w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <div className="flex-1 min-w-0">
+                              <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full mb-3 shadow-sm ${visionAnalysis?.override ? 'bg-red-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                                {visionAnalysis?.override
+                                   ? <AlertTriangle className="h-3 w-3" />
+                                   : <CheckCircle2 className="h-3 w-3" />}
+                                <h4 className="font-black text-[9px] uppercase tracking-widest whitespace-nowrap">
+                                  {visionAnalysis?.traumaLevel === 'LEVEL_1_TRAUMA' ? 'CRITICAL DETECTED' : 'STANDARD SCENE'}
+                                </h4>
+                              </div>
+                              
+                              <div className="space-y-1">
+                                <p className="text-[10px] font-bold text-slate-800 uppercase tracking-tight">Accident Context</p>
+                                <p className="text-[10px] text-slate-500 italic leading-snug line-clamp-2">"{visionAnalysis?.reason}"</p>
+                              </div>
+                            </div>
                           </div>
-                          <p className="text-[10px] text-slate-600 font-medium leading-relaxed italic">"{visionAnalysis?.reason}"</p>
-                          
-                          <div className="mt-2 p-2 bg-blue-50/50 rounded-lg border border-blue-100/50">
-                            <h5 className="text-[9px] font-bold text-blue-700 uppercase mb-1 flex items-center gap-1">
-                              <Bot className="h-3 w-3" /> AI Observation Brief
-                            </h5>
-                            <p className="text-[9px] text-blue-800 leading-tight leading-relaxed">{visionAnalysis?.aiBriefDescription}</p>
-                          </div>
-                          
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {visionAnalysis?.impactScore && (
-                              <Badge key="impact" variant="outline" className={`text-[9px] py-0.5 px-2 font-black border-slate-200 ${visionAnalysis?.impactScore > 70 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                                IMPACT: {visionAnalysis.impactScore}/100
-                              </Badge>
-                            )}
-                            {visionAnalysis?.facilityRequired && (
-                              <Badge key="facility" variant="outline" className="text-[9px] py-0.5 px-2 bg-blue-50 border-blue-100 text-blue-600 font-black">
-                                REQ: {visionAnalysis.facilityRequired}
-                              </Badge>
-                            )}
+
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-3 shadow-inner">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Neural Scan Analysis</span>
+                              <span className="text-[10px] font-bold text-blue-600 px-2 py-0.5 bg-blue-50 rounded-lg border border-blue-100 italic">Score: {visionAnalysis?.impactScore}/100</span>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <p className="text-[10px] text-slate-700 font-medium leading-relaxed leading-snug">
+                                <span className="font-black text-blue-600">AI BRIEF:</span> {visionAnalysis?.aiBriefDescription}
+                              </p>
+                              
+                              <div className="space-y-1.5 pt-1">
+                                <p className="text-[9px] font-black text-red-500 uppercase tracking-widest">Consequences & Risks Identified</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  <Badge className="text-[8px] bg-red-100 text-red-700 hover:bg-red-100 border-none font-bold uppercase py-0.5 px-1.5">Fuel Leakage Risk</Badge>
+                                  <Badge className="text-[8px] bg-red-100 text-red-700 hover:bg-red-100 border-none font-bold uppercase py-0.5 px-1.5">Structural Malformation</Badge>
+                                </div>
+                              </div>
+
+                              <div className="pt-2">
+                                <div className="flex items-center gap-2 text-[9px] font-bold text-slate-400 uppercase mb-1">
+                                  <HospitalIcon className="w-3 h-3 text-blue-500" /> Facility Requirement
+                                </div>
+                                <p className="text-[10px] font-black text-slate-900 border-l-2 border-blue-500 pl-2 leading-none uppercase">
+                                  {visionAnalysis?.facilityRequired || 'STANDARD EMERGENCY DEPT'}
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        <button type="button" onClick={() => { setScenePhoto(null); setVisionAnalysis(null); }} className="shrink-0 text-slate-300 hover:text-red-500 transition-colors">
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
                 )}
               </div>
 
