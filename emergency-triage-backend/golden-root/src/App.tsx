@@ -38,7 +38,7 @@ import {
 import { useState, useEffect } from 'react';
 
 // --- Types ---
-type View = 'landing' | 'dashboard' | 'hospitals' | 'settings' | 'userRoles' | 'manual';
+type View = 'landing' | 'dashboard' | 'hospitals' | 'settings' | 'userRoles' | 'manual' | 'about';
 
 interface User {
   name: string;
@@ -101,7 +101,7 @@ const Sidebar = ({ currentView, setView }: { currentView: View, setView: (v: Vie
           <button 
             key={i} 
             onClick={() => {
-              if (item.id === 'landing' || item.id === 'dashboard' || item.id === 'hospitals' || item.id === 'settings' || item.id === 'userRoles') {
+              if (item.id === 'landing' || item.id === 'dashboard' || item.id === 'hospitals' || item.id === 'settings' || item.id === 'userRoles' || item.id === 'about') {
                 setView(item.id as View);
               }
             }}
@@ -761,6 +761,34 @@ const SettingsView = ({ user, onUpdateUser }: { user: User | null, onUpdateUser:
     </div>
   );
 };
+
+// --- About Us View ---
+const AboutView = () => (
+  <motion.div 
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="max-w-4xl mx-auto space-y-12 py-10"
+  >
+    <div className="text-center space-y-4">
+      <h2 className="text-5xl font-display font-bold text-gold">Our Vision</h2>
+      <p className="text-white/40 text-lg">Revolutionizing emergency response through deep integration and real-time intelligence.</p>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="glass p-10 rounded-[40px] border-gold/10 gold-glow">
+        <p className="text-xl leading-relaxed text-white/80">
+          The Golden Root project was conceived to eliminate the critical delays in emergency triage that often cost lives. By seamlessly connecting vision-based accident classification with real-time hospital operational data, we've created a first-of-its-kind ecosystem where the right care is identified before the ambulance even reaches the scene.
+        </p>
+      </div>
+
+      <div className="glass p-10 rounded-[40px] border-gold/10 gold-glow">
+        <p className="text-xl leading-relaxed text-white/80">
+          In the healthcare sector, our system serves as a force multiplier for dispatchers and medical professionals alike. By automating the identification of trauma levels and providing instant, live updates on ICU bed availability and specialized unit status, we ensure that every critical patient is routed to the facility most capable of saving them, significantly reducing wait times and improving overall survival rates across the regional network.
+        </p>
+      </div>
+    </div>
+  </motion.div>
+);
 
 // --- Landing Page Components ---
 const Hero = ({ setView }: { setView: (v: View) => void }) => {
@@ -1746,6 +1774,16 @@ export default function App() {
               exit={{ opacity: 0, y: -10 }}
             >
               <ManualView />
+            </motion.div>
+          )}
+          {view === 'about' && (
+            <motion.div
+              key="about"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <AboutView />
             </motion.div>
           )}
         </AnimatePresence>
