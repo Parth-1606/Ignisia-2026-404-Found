@@ -75,6 +75,19 @@ const userLocationIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
+const roadblockIcon = L.divIcon({
+  className: 'custom-roadblock-icon',
+  html: `
+    <div style="position:relative;width:32px;height:32px;display:flex;align-items:center;justify-content:center;">
+      <div style="position:absolute;width:40px;height:40px;border-radius:50%;background:rgba(239,68,68,0.5);animation:pulse-ring 1s ease-out infinite;"></div>
+      <div style="position:relative;z-index:10;font-size:24px;line-height:1;filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));">⛔</div>
+    </div>
+  `,
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+  popupAnchor: [0, -16],
+});
+
 // Types
 type Hospital = {
   id: string;
@@ -182,6 +195,7 @@ export default function App() {
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [roadblockLocation, setRoadblockLocation] = useState<[number, number] | null>(null);
   const [liveUpdates, setLiveUpdates] = useState<{id: string; text: string; time: string; type: 'up' | 'down'}[]>([]);
   const [availableAmbulances, setAvailableAmbulances] = useState<{id: string; lat: number; lng: number}[]>([]);
 
@@ -617,6 +631,7 @@ export default function App() {
     previousHospital: string;
     newHospital: string;
     reason: string;
+    pendingPatients?: Patient[];
   } | null>(null);
 
   const simulateRoadClosure = async () => {    
@@ -643,13 +658,21 @@ export default function App() {
              [nearest.lat, nearest.lng]
            );
 
+           // Calculate midpoint of remaining route to place the roadblock marker
+           const remRoute = p.routeToHospital || [];
+           const blockIdx = Math.floor(remRoute.length / 3) + p.currentRouteIndex;
+           const blockPoint = remRoute[blockIdx] || [p.ambulanceLat + 0.01, p.ambulanceLng + 0.01];
+
            if (rerouteCount === 0) {
+             setRoadblockLocation(blockPoint as [number, number]);
+             setMapCenter(blockPoint as [number, number]); // Focus map on the blockage
              setRerouteAlert({
                isOpen: true,
                unitId: p.dispatchedUnit || 'Ambulance Unit',
                previousHospital: oldHospitalName,
                newHospital: nearest.name,
-               reason: 'Three major arterial roads closed due to sudden pile-up. Route blocked.'
+               reason: 'Three major arterial roads closed ahead due to an emergency.',
+               pendingPatients: [] // We fill this later after loop
              });
            }
 
@@ -658,7 +681,7 @@ export default function App() {
              assignedHospitalId: nearest.id,
              routeToHospital: newRouteToHospital,
              currentRouteIndex: 0,
-             routingRationale: `🚨 DYNAMIC DETOUR: Major arterial road closure detected mid-journey. Engine automatically rerouted ${p.dispatchedUnit} to ${nearest.name} to preserve ETA.`
+             routingRationale: `🚨 DYNAMIC DETOUR: Major arterial road closure ahead. Route recalculated to ${nearest.name}.`
            });
            rerouteCount++;
            continue;
@@ -666,9 +689,10 @@ export default function App() {
       }
       newPatients.push(p);
     }
-    setPatients(newPatients);
     
-    if (rerouteCount === 0) {
+    if (rerouteCount > 0) {
+      setRerouteAlert(prev => prev ? { ...prev, pendingPatients: newPatients } : null);
+    } else {
       alert("No active ambulances are currently en-route to a hospital to demonstrate the detour.");
     }
   };
@@ -1253,6 +1277,19 @@ export default function App() {
                 </React.Fragment>
               );
             })}
+
+            {/* Roadblock Marker on Map */}
+            {roadblockLocation && (
+              <Marker position={roadblockLocation} icon={roadblockIcon} zIndexOffset={1200}>
+                <Popup>
+                  <div style={{minWidth: 160}}>
+                    <div className="font-bold text-sm text-red-600 flex items-center gap-1">⛔ Road Closure</div>
+                    <div className="text-xs text-gray-600 mt-1">Major arterial road blocked due to emergency.</div>
+                    <div className="text-xs text-slate-500 mt-1">All traffic rerouted. Click header button to clear.</div>
+                  </div>
+                </Popup>
+              </Marker>
+            )}
           </MapContainer>
           
           {/* Map Overlay Hint */}
@@ -1260,6 +1297,23 @@ export default function App() {
             <MousePointerClick className="h-4 w-4 text-blue-500" />
             Click map to set incident location
           </div>
+
+          {/* Google Maps-style Road Closure Banner */}
+          {roadblockLocation && (
+            <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[401] bg-red-600 text-white px-5 py-2.5 rounded-xl shadow-[0_4px_20px_rgba(220,38,38,0.5)] flex items-center gap-3 animate-in slide-in-from-top-4 duration-300">
+              <span className="text-lg">{'\u26d4'}</span>
+              <div>
+                <span className="font-bold text-sm">Road Closure Ahead</span>
+                <span className="text-red-100 text-xs ml-2">3 arterial roads blocked</span>
+              </div>
+              <button 
+                onClick={() => setRoadblockLocation(null)} 
+                className="ml-3 text-red-200 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg p-1 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
 
           {/* Map Legend */}
           <div className="absolute bottom-6 right-6 z-[400] bg-white/95 backdrop-blur-md rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200 p-4 text-xs font-medium text-slate-700 pointer-events-none w-48">
@@ -1294,6 +1348,12 @@ export default function App() {
                 </div>
                 <span>Active Dispatch</span>
               </div>
+              {roadblockLocation && (
+                <div className="flex items-center gap-3">
+                  <div className="text-base shrink-0 leading-none">{'\u26d4'}</div>
+                  <span className="text-red-600 font-semibold">Road Closure</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1525,6 +1585,81 @@ export default function App() {
           </Button>
         </div>
       </footer>
+
+      {/* Reroute Decision Modal — Google Maps style */}
+      {rerouteAlert?.isOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[2000] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 30 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden"
+          >
+            {/* Red banner */}
+            <div className="bg-gradient-to-r from-red-600 to-red-700 p-5 text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-2xl">⛔</div>
+                <div>
+                  <h3 className="font-bold text-lg">Road Closure Ahead</h3>
+                  <p className="text-red-100 text-sm">{rerouteAlert.reason}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Details Cards */}
+            <div className="p-5 space-y-4">
+              {/* Affected unit */}
+              <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Affected Unit</span>
+                  <span className="font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg text-sm">{rerouteAlert.unitId}</span>
+                </div>
+
+                <div className="border-t border-slate-200 pt-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-500">Original Destination</span>
+                    <span className="text-sm font-semibold text-slate-800 line-through decoration-red-500 decoration-2">{rerouteAlert.previousHospital}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-emerald-600 uppercase tracking-wide">↳ Suggested Reroute</span>
+                    <span className="text-sm font-bold text-emerald-700">{rerouteAlert.newHospital}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Rationale */}
+              <div className="bg-blue-50 rounded-xl border border-blue-100 p-3 flex gap-3 items-start">
+                <Bot className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-800">Ignisia AI constraint engine has verified that <strong>{rerouteAlert.newHospital}</strong> has the required trauma level, ICU capacity, and cath lab. This reroute minimizes ETA delay caused by the road closure.</p>
+              </div>
+            </div>
+
+            {/* Decision Buttons */}
+            <div className="p-5 bg-slate-50 border-t border-slate-200 flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 h-12 font-semibold text-slate-600 border-slate-300 hover:bg-slate-100"
+                onClick={() => {
+                  setRerouteAlert(null);
+                  // Don't apply pendingPatients — keep original route
+                }}
+              >
+                Continue Original Route
+              </Button>
+              <Button
+                className="flex-1 h-12 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg"
+                onClick={() => {
+                  if (rerouteAlert.pendingPatients) {
+                    setPatients(rerouteAlert.pendingPatients);
+                  }
+                  setRerouteAlert(null);
+                }}
+              >
+                ✓ Accept Alternative Route
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Floating AI Chat Assistant */}
       <AnimatePresence>
