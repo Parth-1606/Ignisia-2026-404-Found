@@ -611,6 +611,67 @@ export default function App() {
   const [chatInput, setChatInput] = useState('');
 
   const [sosActive, setSosActive] = useState(false);
+  const [rerouteAlert, setRerouteAlert] = useState<{
+    isOpen: boolean;
+    unitId: string;
+    previousHospital: string;
+    newHospital: string;
+    reason: string;
+  } | null>(null);
+
+  const simulateRoadClosure = async () => {    
+    const newPatients = [];
+    let rerouteCount = 0;
+    
+    for (const p of patients) {
+      if (p.currentRoutePhase === 'TO_HOSPITAL' && p.assignedHospitalId) {
+         const oldHospitalName = hospitals.find(h => h.id === p.assignedHospitalId)?.name || 'Unknown Hospital';
+         const availableHospitals = hospitals.filter(h => h.id !== p.assignedHospitalId);
+         const validHospitals = p.severity === 'Critical' ? availableHospitals.filter(h => h.hasNeuro && h.hasCathLab) : availableHospitals;
+         
+         if (validHospitals.length > 0) {
+           // Find nearest alternative hospital from the ambulance's current location to simulate a mid-journey detour
+           let nearest = validHospitals[0];
+           let minDist = Infinity;
+           validHospitals.forEach(h => {
+             const dist = Math.pow(h.lat - p.ambulanceLat, 2) + Math.pow(h.lng - p.ambulanceLng, 2);
+             if (dist < minDist) { minDist = dist; nearest = h; }
+           });
+
+           const newRouteToHospital = await fetchRoute(
+             [p.ambulanceLat, p.ambulanceLng],
+             [nearest.lat, nearest.lng]
+           );
+
+           if (rerouteCount === 0) {
+             setRerouteAlert({
+               isOpen: true,
+               unitId: p.dispatchedUnit || 'Ambulance Unit',
+               previousHospital: oldHospitalName,
+               newHospital: nearest.name,
+               reason: 'Three major arterial roads closed due to sudden pile-up. Route blocked.'
+             });
+           }
+
+           newPatients.push({
+             ...p,
+             assignedHospitalId: nearest.id,
+             routeToHospital: newRouteToHospital,
+             currentRouteIndex: 0,
+             routingRationale: `🚨 DYNAMIC DETOUR: Major arterial road closure detected mid-journey. Engine automatically rerouted ${p.dispatchedUnit} to ${nearest.name} to preserve ETA.`
+           });
+           rerouteCount++;
+           continue;
+         }
+      }
+      newPatients.push(p);
+    }
+    setPatients(newPatients);
+    
+    if (rerouteCount === 0) {
+      alert("No active ambulances are currently en-route to a hospital to demonstrate the detour.");
+    }
+  };
 
   const triggerSOS = async () => {
     setSosActive(true);
@@ -802,7 +863,17 @@ export default function App() {
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isMassCasualty ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
           </div>
-          <div className="text-sm bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 flex items-center gap-2">
+          
+          <Button 
+            variant="outline"
+            onClick={simulateRoadClosure} 
+            className="hidden sm:flex bg-amber-900 border-amber-600 text-amber-400 hover:bg-amber-800 hover:text-amber-300 text-xs h-9 tracking-wide"
+          >
+            <AlertTriangle className="mr-2 h-4 w-4 text-amber-400" />
+            Mid-Journey Roadblock Sim
+          </Button>
+
+          <div className="text-sm bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 flex items-center gap-2 ml-2">
             <span className="text-slate-400">Active Units:</span>
             <span className="font-bold text-red-400 text-lg leading-none">{patients.length}</span>
           </div>
