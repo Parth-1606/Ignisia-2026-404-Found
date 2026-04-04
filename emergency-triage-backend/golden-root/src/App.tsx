@@ -520,7 +520,6 @@ const SettingsView = ({ user, onUpdateUser }: { user: User | null, onUpdateUser:
 
   const tabs = [
     { id: 'general', label: 'General', icon: <Settings className="w-4 h-4" /> },
-    { id: 'account', label: 'Plan & Usage', icon: <CreditCard className="w-4 h-4" /> },
     { id: 'medical', label: 'Medical History', icon: <History className="w-4 h-4" /> },
   ];
 
