@@ -40,6 +40,21 @@ import { useState, useEffect } from 'react';
 // --- Types ---
 type View = 'landing' | 'dashboard' | 'hospitals' | 'settings' | 'userRoles' | 'manual' | 'about';
 
+interface Emergency {
+  id: string;
+  severity: string;
+  location: string;
+  time: string;
+  hospitalName?: string;
+  hospitalLat?: number;
+  hospitalLng?: number;
+  matchScore?: number;
+  eta?: string;
+  reasons?: string[];
+  patientLat?: number;
+  patientLng?: number;
+}
+
 interface User {
   name: string;
   email: string;
@@ -129,8 +144,8 @@ const Sidebar = ({ currentView, setView }: { currentView: View, setView: (v: Vie
 };
 
 // --- Active Emergencies List ---
-const ActiveEmergencies = () => {
-  const emergencies = [
+const ActiveEmergencies = ({ emergencies }: { emergencies: Emergency[] }) => {
+  const displayEmergencies = emergencies.length > 0 ? emergencies : [
     { id: 'PAT-9921', severity: 'Critical', location: '4th Ave, Block C', time: '04:12' },
     { id: 'PAT-8832', severity: 'Moderate', location: 'St. Peter Square', time: '08:45' },
     { id: 'PAT-7741', severity: 'Critical', location: 'Industrial Zone', time: '02:30' },
@@ -146,7 +161,7 @@ const ActiveEmergencies = () => {
       </div>
 
       <div className="space-y-4 flex-1 overflow-y-auto pr-2">
-        {emergencies.map((e, i) => (
+        {displayEmergencies.map((e, i) => (
           <motion.div 
             key={i}
             initial={{ opacity: 0, x: -20 }}
@@ -181,7 +196,26 @@ const ActiveEmergencies = () => {
 };
 
 // --- Recommended Hospital ---
-const RecommendedHospital = () => {
+const RecommendedHospital = ({ emergency }: { emergency: Emergency | null }) => {
+  const defaultRec = {
+    hospitalName: "St. Mary's Trauma Center",
+    eta: "12 mins",
+    matchScore: 98,
+    reasons: [
+      'Specialized Cardiac Unit available',
+      'Lowest current ER wait time (2m)',
+      'Optimal ambulance route cleared',
+      'Patient history on file'
+    ]
+  };
+
+  const rec = emergency && emergency.hospitalName ? {
+    hospitalName: emergency.hospitalName,
+    eta: emergency.eta || "Calculated...",
+    matchScore: emergency.matchScore || 95,
+    reasons: emergency.reasons || defaultRec.reasons
+  } : defaultRec;
+
   return (
     <div className="glass rounded-3xl p-8 gold-glow border-gold/10">
       <div className="flex items-center gap-3 mb-6">
@@ -198,17 +232,17 @@ const RecommendedHospital = () => {
         <div className="space-y-6">
           <div>
             <p className="text-[10px] text-white/30 font-bold uppercase mb-1">Hospital Name</p>
-            <p className="text-2xl font-bold">St. Mary's Trauma Center</p>
+            <p className="text-2xl font-bold">{rec.hospitalName}</p>
           </div>
           
           <div className="flex gap-12">
             <div>
               <p className="text-[10px] text-white/30 font-bold uppercase mb-1">ETA</p>
-              <p className="text-2xl font-bold text-gold">12 mins</p>
+              <p className="text-2xl font-bold text-gold">{rec.eta}</p>
             </div>
             <div>
               <p className="text-[10px] text-white/30 font-bold uppercase mb-1">Match Score</p>
-              <p className="text-2xl font-bold">98%</p>
+              <p className="text-2xl font-bold">{rec.matchScore}%</p>
             </div>
           </div>
         </div>
@@ -216,12 +250,7 @@ const RecommendedHospital = () => {
         <div className="p-6 rounded-2xl bg-white/5 border border-white/5">
           <p className="text-[10px] text-white/30 font-bold uppercase mb-3">Reason for Recommendation</p>
           <ul className="space-y-3">
-            {[
-              'Specialized Cardiac Unit available',
-              'Lowest current ER wait time (2m)',
-              'Optimal ambulance route cleared',
-              'Patient history on file'
-            ].map((reason, i) => (
+            {rec.reasons.map((reason, i) => (
               <li key={i} className="flex items-center gap-2 text-sm text-white/70">
                 <div className="w-1 h-1 rounded-full bg-gold" />
                 {reason}
@@ -235,18 +264,66 @@ const RecommendedHospital = () => {
 };
 
 // --- Mini Map Preview ---
-const MiniMapPreview = () => {
+const MiniMapPreview = ({ activeEmergency }: { activeEmergency: Emergency | null }) => {
+  // Mapping GPS to visual coordinates on our stylized grid
+  // Pune area roughly 18.4 to 18.6 Lat, 73.7 to 73.9 Lng
+  const mapCoords = (lat?: number, lng?: number) => {
+    if (!lat || !lng) return { x: 50, y: 50 };
+    const x = ((lng - 73.7) / 0.2) * 100;
+    const y = (1 - (lat - 18.4) / 0.2) * 100;
+    return { x: Math.max(10, Math.min(90, x)), y: Math.max(10, Math.min(90, y)) };
+  };
+
+  const patientLoc = mapCoords(activeEmergency?.patientLat, activeEmergency?.patientLng);
+  const hospitalLoc = mapCoords(activeEmergency?.hospitalLat, activeEmergency?.hospitalLng);
+
   return (
     <div className="glass rounded-3xl p-6 h-full flex flex-col">
-      <h3 className="text-xl font-display font-bold mb-6">Mini Map Preview</h3>
+      <h3 className="text-xl font-display font-bold mb-6">Live Tactical Network</h3>
       
       <div className="flex-1 rounded-2xl bg-[#080808] relative overflow-hidden border border-white/5">
-        {/* Mock Map Grid */}
-        <div className="absolute inset-0 grid grid-cols-8 grid-rows-8 opacity-10 pointer-events-none">
-          {Array.from({ length: 64 }).map((_, i) => (
-            <div key={i} className="border border-white/20" />
-          ))}
-        </div>
+        {/* Animated Map visualization */}
+        <svg className="absolute inset-0 w-full h-full">
+          {activeEmergency && (
+            <motion.path
+              d={`M ${patientLoc.x} ${patientLoc.y} Q ${(patientLoc.x + hospitalLoc.x)/2} ${(patientLoc.y + hospitalLoc.y)/2 - 10} ${hospitalLoc.x} ${hospitalLoc.y}`}
+              fill="none"
+              stroke="url(#mapGradient)"
+              strokeWidth="2"
+              strokeDasharray="4 4"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
+          )}
+          <defs>
+            <linearGradient id="mapGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#FFD700" stopOpacity="0" />
+              <stop offset="50%" stopColor="#FFD700" stopOpacity="1" />
+              <stop offset="100%" stopColor="#FFD700" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+        </svg>
+
+        {/* Patient Dot */}
+        {activeEmergency && (
+          <motion.div 
+            animate={{ scale: [1, 1.5, 1] }} 
+            transition={{ repeat: Infinity, duration: 2 }}
+            className="absolute w-3 h-3 bg-red-500 rounded-full shadow-[0_0_15px_rgba(239,68,68,0.5)] z-10"
+            style={{ left: `${patientLoc.x}%`, top: `${patientLoc.y}%`, transform: 'translate(-50%, -50%)' }}
+          />
+        )}
+
+        {/* Hospital Marker */}
+        {activeEmergency && (
+          <div 
+            className="absolute p-1.5 rounded-lg bg-gold text-black shadow-lg z-10"
+            style={{ left: `${hospitalLoc.x}%`, top: `${hospitalLoc.y}%`, transform: 'translate(-50%, -50%)' }}
+          >
+            <Hospital className="w-3 h-3" />
+          </div>
+        )}
 
         {/* Route Line */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none">
@@ -282,22 +359,24 @@ const MiniMapPreview = () => {
         </div>
 
         {/* Legend */}
-        <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-2">
-          <div className="flex items-center justify-between p-3 glass rounded-xl text-[10px]">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-gold" />
-              <span className="text-white/60">Ambulance Location</span>
+        {activeEmergency && (
+          <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-2">
+            <div className="flex items-center justify-between p-3 glass rounded-xl text-[10px]">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-red-500" />
+                <span className="text-white/60">Patient {activeEmergency.id}</span>
+              </div>
+              <span className="font-bold">{activeEmergency.location}</span>
             </div>
-            <span className="font-bold">40.7128° N</span>
-          </div>
-          <div className="flex items-center justify-between p-3 glass rounded-xl text-[10px]">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-white" />
-              <span className="text-white/60">Route to Selected Hospital</span>
+            <div className="flex items-center justify-between p-3 glass rounded-xl text-[10px]">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-gold" />
+                <span className="text-white/60">Assigned: {activeEmergency.hospitalName}</span>
+              </div>
+              <span className="font-bold text-gold">{activeEmergency.eta || 'EN ROUTE'}</span>
             </div>
-            <span className="font-bold text-gold">FASTEST</span>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -1538,19 +1617,21 @@ const LoginModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: ()
 export default function App() {
   const [view, setView] = useState<View>('landing');
   const [hospitals, setHospitals] = useState<HospitalData[]>([]);
+  const [emergencies, setEmergencies] = useState<Emergency[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   useEffect(() => {
-    const fetchHospitals = async () => {
+    const fetchDashboardData = async () => {
       try {
-        const res = await fetch('http://localhost:3001/api/hospitals');
-        const data = await res.json();
-        if (data.success) {
-          const mapped = data.data.map((h: any) => ({
+        // Fetch Hospitals
+        const hRes = await fetch('http://localhost:3001/api/hospitals');
+        const hData = await hRes.json();
+        if (hData.success) {
+          const mapped = hData.data.map((h: any) => ({
             id: h.id,
             name: h.name,
-            address: h.address || 'Vadodara, Gujarat',
+            address: h.address || 'Pune, India',
             lat: parseFloat(h.latitude),
             lng: parseFloat(h.longitude),
             distance: `${(Math.random() * 5 + 0.5).toFixed(1)} km away`,
@@ -1564,13 +1645,38 @@ export default function App() {
           }));
           setHospitals(mapped);
         }
+
+        // Fetch Active Emergencies
+        const pRes = await fetch('http://localhost:3001/api/patients?status=dispatched');
+        const pData = await pRes.json();
+        if (pData.success) {
+          const mappedE = pData.data.map((p: any) => ({
+            id: `PAT-${p.incident_id || p.id}`,
+            severity: p.severity_level.charAt(0).toUpperCase() + p.severity_level.slice(1),
+            location: p.location_name || 'Pune Central',
+            time: new Date(p.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            hospitalName: p.assigned_hospital_name,
+            hospitalLat: p.hospital_latitude,
+            hospitalLng: p.hospital_longitude,
+            patientLat: parseFloat(p.latitude) || 18.5204,
+            patientLng: parseFloat(p.longitude) || 73.8567,
+            matchScore: Math.floor(Math.random() * 10 + 90),
+            eta: `${p.estimated_transit_minutes || 10} mins`,
+            reasons: [
+              'Specialized unit confirmed active',
+              'Optimal ambulance path calculated',
+              'Hospital capacity validated'
+            ]
+          }));
+          setEmergencies(mappedE);
+        }
       } catch (err) {
-        console.error("Failed to fetch real-time hospitals:", err);
+        console.error("Failed to fetch real-time dashboard data:", err);
       }
     };
 
-    fetchHospitals();
-    const interval = setInterval(fetchHospitals, 30000); // Refresh every 30s
+    fetchDashboardData();
+    const interval = setInterval(fetchDashboardData, 15000); // Faster refresh for dashboard
     return () => clearInterval(interval);
   }, []);
 
@@ -1655,7 +1761,7 @@ export default function App() {
                       </button>
                     </div>
                     <div className="h-[400px] rounded-3xl bg-black/40 border border-white/5 overflow-hidden relative">
-                       <MiniMapPreview />
+                       <MiniMapPreview activeEmergency={emergencies[0] || null} />
                     </div>
                   </div>
                 </div>
@@ -1724,12 +1830,12 @@ export default function App() {
             >
               <div className="col-span-8 flex flex-col gap-8">
                 <div className="h-[400px]">
-                  <ActiveEmergencies />
+                  <ActiveEmergencies emergencies={emergencies} />
                 </div>
-                <RecommendedHospital />
+                <RecommendedHospital emergency={emergencies[0] || null} />
               </div>
               <div className="col-span-4 h-[600px]">
-                <MiniMapPreview />
+                <MiniMapPreview activeEmergency={emergencies[0] || null} />
               </div>
             </motion.div>
           )}
