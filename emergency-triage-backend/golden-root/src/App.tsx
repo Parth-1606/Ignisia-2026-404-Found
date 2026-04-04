@@ -372,129 +372,9 @@ const MiniMapPreview = ({ activeEmergency }: { activeEmergency: Emergency | null
 };
 
 // --- Nearby Hospitals View ---
-const HospitalsView = ({ hospitals: dynamicHospitals }: { hospitals: HospitalData[] }) => {
+const HospitalsView = ({ hospitals: displayHospitals, onRefresh }: { hospitals: HospitalData[], onRefresh: () => void }) => {
   const [sortBy, setSortBy] = useState<'distance' | 'beds' | 'waitTime'>('distance');
   const [isSortOpen, setIsSortOpen] = useState(false);
-
-  const initialHospitals = [
-    { 
-      id: 1, 
-      name: "SSG Hospital", 
-      address: "Jail Road, Raopura, Vadodara, Gujarat", 
-      distance: "0.8 km away", 
-      distanceVal: 0.8,
-      driveTime: "5 mins", 
-      waitTime: "15 mins", 
-      waitTimeVal: 15,
-      beds: "6/40", 
-      bedsVal: 6,
-      bedPercent: 15,
-      lat: 22.3072,
-      lng: 73.1812,
-      level: 1,
-      icuAvailable: 6,
-      icuTotal: 40,
-      ventsAvailable: 4,
-      ventsTotal: 10,
-      hasNeuro: true,
-      hasCathLab: true,
-      load: 85
-    },
-    { 
-      id: 2, 
-      name: "Bhailal Amin General Hospital", 
-      address: "GIDC Rd, Gorwa, Vadodara, Gujarat", 
-      distance: "1.3 km away", 
-      distanceVal: 1.3,
-      driveTime: "8 mins", 
-      waitTime: "10 mins", 
-      waitTimeVal: 10,
-      beds: "19/50", 
-      bedsVal: 19,
-      bedPercent: 38,
-      lat: 22.3321,
-      lng: 73.1567,
-      level: 1,
-      icuAvailable: 19,
-      icuTotal: 50,
-      ventsAvailable: 12,
-      ventsTotal: 25,
-      hasNeuro: true,
-      hasCathLab: false,
-      load: 62
-    },
-    { 
-      id: 3, 
-      name: "Baroda Medical College Hospital", 
-      address: "Anandpura, Vadodara, Gujarat", 
-      distance: "1.7 km away", 
-      distanceVal: 1.7,
-      driveTime: "12 mins", 
-      waitTime: "20 mins", 
-      waitTimeVal: 20,
-      beds: "7/30", 
-      bedsVal: 7,
-      bedPercent: 23,
-      lat: 22.3085,
-      lng: 73.1921,
-      level: 1,
-      icuAvailable: 7,
-      icuTotal: 30,
-      ventsAvailable: 5,
-      ventsTotal: 15,
-      hasNeuro: false,
-      hasCathLab: false,
-      load: 77
-    },
-    { 
-      id: 4, 
-      name: "Kailash Cancer Hospital", 
-      address: "Munjmahuda, Vadodara, Gujarat", 
-      distance: "2.2 km away", 
-      distanceVal: 2.2,
-      driveTime: "15 mins", 
-      waitTime: "5 mins", 
-      waitTimeVal: 5,
-      beds: "33/60", 
-      bedsVal: 33,
-      bedPercent: 55,
-      lat: 22.2891,
-      lng: 73.1745,
-      level: 2,
-      icuAvailable: 33,
-      icuTotal: 60,
-      ventsAvailable: 15,
-      ventsTotal: 30,
-      hasNeuro: false,
-      hasCathLab: true,
-      load: 45
-    },
-    { 
-      id: 5, 
-      name: "Sterling Hospital", 
-      address: "Race Course Road, Vadodara, Gujarat", 
-      distance: "2.5 km away", 
-      distanceVal: 2.5,
-      driveTime: "18 mins", 
-      waitTime: "8 mins", 
-      waitTimeVal: 8,
-      beds: "25/45", 
-      bedsVal: 25,
-      bedPercent: 55,
-      lat: 22.3123,
-      lng: 73.1678,
-      level: 1,
-      icuAvailable: 25,
-      icuTotal: 45,
-      ventsAvailable: 20,
-      ventsTotal: 25,
-      hasNeuro: true,
-      hasCathLab: true,
-      load: 35
-    }
-  ];
-
-  const displayHospitals = dynamicHospitals.length > 0 ? dynamicHospitals : initialHospitals;
 
   const sortedHospitals = [...displayHospitals].sort((a, b) => {
     if (sortBy === 'distance') return a.distanceVal - b.distanceVal;
@@ -510,7 +390,6 @@ const HospitalsView = ({ hospitals: dynamicHospitals }: { hospitals: HospitalDat
   ];
 
   const handleViewRoute = (h: HospitalData) => {
-    // Ensuring the route starts from the user's current location with driving directions
     const url = `https://www.google.com/maps/dir/?api=1&origin=My+Location&destination=${h.lat},${h.lng}&travelmode=driving`;
     window.open(url, '_blank');
   };
@@ -523,7 +402,10 @@ const HospitalsView = ({ hospitals: dynamicHospitals }: { hospitals: HospitalDat
           <p className="text-white/40">Top facilities by proximity—ready to wire to live capacity APIs.</p>
         </div>
         <div className="flex items-center gap-4">
-          <button className="px-6 py-3 glass rounded-2xl flex items-center gap-2 text-sm font-bold hover:bg-white/5 transition-all">
+          <button 
+            onClick={onRefresh}
+            className="px-6 py-3 glass rounded-2xl flex items-center gap-2 text-sm font-bold hover:bg-white/5 transition-all"
+          >
             <RotateCcw className="w-4 h-4" />
             Refresh
           </button>
@@ -1609,65 +1491,77 @@ export default function App() {
   const [emergencies, setEmergencies] = useState<Emergency[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notifications] = useState([
+    { id: 1, title: 'Ambulance GJ-06 arrived', time: '2m ago', type: 'info' },
+    { id: 2, title: 'Hospital Diverting Alert', time: '15m ago', type: 'warning' },
+    { id: 3, title: 'New Emergency Reported', time: '1h ago', type: 'critical' },
+  ]);
+
+  const fetchDashboardData = async () => {
+    try {
+      // Fetch Hospitals
+      const hRes = await fetch('http://localhost:3001/api/hospitals');
+      const hData = await hRes.json();
+      if (hData.success) {
+        const mapped = hData.data.map((h: any) => ({
+          id: h.id,
+          name: h.name,
+          address: h.address || 'Pune, India',
+          lat: parseFloat(h.latitude),
+          lng: parseFloat(h.longitude),
+          distance: `${(Math.random() * 5 + 0.5).toFixed(1)} km away`,
+          distanceVal: Math.random() * 5,
+          driveTime: `${Math.floor(Math.random() * 20 + 5)} mins`,
+          waitTime: `${h.current_load_percent ? Math.floor(h.current_load_percent / 5) : 10} mins`,
+          waitTimeVal: h.current_load_percent || 0,
+          beds: `${h.icu_beds_available}/${h.icu_beds_total}`,
+          bedsVal: h.icu_beds_available,
+          bedPercent: h.icu_beds_total > 0 ? (h.icu_beds_available / h.icu_beds_total) * 100 : 0
+        }));
+        setHospitals(mapped);
+      }
+
+      // Fetch Active Emergencies
+      const pRes = await fetch('http://localhost:3001/api/patients?status=dispatched');
+      const pData = await pRes.json();
+      if (pData.success) {
+        const mappedE = pData.data.map((p: any) => ({
+          id: `PAT-${p.incident_id || p.id}`,
+          severity: p.severity_level.charAt(0).toUpperCase() + p.severity_level.slice(1),
+          location: p.location_name || 'Pune Central',
+          time: new Date(p.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          hospitalName: p.assigned_hospital_name,
+          hospitalLat: p.hospital_latitude,
+          hospitalLng: p.hospital_longitude,
+          patientLat: parseFloat(p.latitude) || 18.5204,
+          patientLng: parseFloat(p.longitude) || 73.8567,
+          matchScore: Math.floor(Math.random() * 10 + 90),
+          eta: `${p.estimated_transit_minutes || 10} mins`,
+          reasons: [
+            'Specialized unit confirmed active',
+            'Optimal ambulance path calculated',
+            'Hospital capacity validated'
+          ]
+        }));
+        setEmergencies(mappedE);
+      }
+    } catch (err) {
+      console.error("Failed to fetch real-time dashboard data:", err);
+    }
+  };
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        // Fetch Hospitals
-        const hRes = await fetch('http://localhost:3001/api/hospitals');
-        const hData = await hRes.json();
-        if (hData.success) {
-          const mapped = hData.data.map((h: any) => ({
-            id: h.id,
-            name: h.name,
-            address: h.address || 'Pune, India',
-            lat: parseFloat(h.latitude),
-            lng: parseFloat(h.longitude),
-            distance: `${(Math.random() * 5 + 0.5).toFixed(1)} km away`,
-            distanceVal: Math.random() * 5,
-            driveTime: `${Math.floor(Math.random() * 20 + 5)} mins`,
-            waitTime: `${h.current_load_percent ? Math.floor(h.current_load_percent / 5) : 10} mins`,
-            waitTimeVal: h.current_load_percent || 0,
-            beds: `${h.icu_beds_available}/${h.icu_beds_total}`,
-            bedsVal: h.icu_beds_available,
-            bedPercent: h.icu_beds_total > 0 ? (h.icu_beds_available / h.icu_beds_total) * 100 : 0
-          }));
-          setHospitals(mapped);
-        }
-
-        // Fetch Active Emergencies
-        const pRes = await fetch('http://localhost:3001/api/patients?status=dispatched');
-        const pData = await pRes.json();
-        if (pData.success) {
-          const mappedE = pData.data.map((p: any) => ({
-            id: `PAT-${p.incident_id || p.id}`,
-            severity: p.severity_level.charAt(0).toUpperCase() + p.severity_level.slice(1),
-            location: p.location_name || 'Pune Central',
-            time: new Date(p.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            hospitalName: p.assigned_hospital_name,
-            hospitalLat: p.hospital_latitude,
-            hospitalLng: p.hospital_longitude,
-            patientLat: parseFloat(p.latitude) || 18.5204,
-            patientLng: parseFloat(p.longitude) || 73.8567,
-            matchScore: Math.floor(Math.random() * 10 + 90),
-            eta: `${p.estimated_transit_minutes || 10} mins`,
-            reasons: [
-              'Specialized unit confirmed active',
-              'Optimal ambulance path calculated',
-              'Hospital capacity validated'
-            ]
-          }));
-          setEmergencies(mappedE);
-        }
-      } catch (err) {
-        console.error("Failed to fetch real-time dashboard data:", err);
-      }
-    };
-
     fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 15000); // Faster refresh for dashboard
+    const interval = setInterval(fetchDashboardData, 15000); 
     return () => clearInterval(interval);
   }, []);
+
+  const filteredHospitals = hospitals.filter(h => 
+    h.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    h.address?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="flex min-h-screen bg-dark-bg text-white overflow-hidden">
@@ -1691,14 +1585,44 @@ export default function App() {
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                 <input 
                   type="text" 
-                  placeholder="Search anything..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search hospitals..." 
                   className="pl-12 pr-6 py-3 rounded-2xl glass focus:outline-none focus:border-gold/30 transition-all w-64 text-sm"
                 />
               </div>
-              <button className="w-12 h-12 glass rounded-2xl flex items-center justify-center hover:bg-white/5 transition-all relative">
-                <Bell className="w-5 h-5 text-white/60" />
-                <span className="absolute top-3 right-3 w-2 h-2 bg-gold rounded-full border-2 border-dark-bg" />
-              </button>
+              <div className="relative">
+                <button 
+                  onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                  className={`w-12 h-12 glass rounded-2xl flex items-center justify-center hover:bg-white/5 transition-all relative ${isNotificationsOpen ? 'bg-white/10 ring-1 ring-gold/30' : ''}`}
+                >
+                  <Bell className="w-5 h-5 text-white/60" />
+                  <span className="absolute top-3 right-3 w-2 h-2 bg-gold rounded-full border-2 border-dark-bg" />
+                </button>
+                
+                <AnimatePresence>
+                  {isNotificationsOpen && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute right-0 mt-3 w-80 glass rounded-3xl border border-white/10 shadow-2xl overflow-hidden z-50 py-2"
+                    >
+                      <div className="px-6 py-3 border-b border-white/5 bg-white/5">
+                        <p className="text-xs font-black uppercase tracking-widest text-gold">Live Notifications</p>
+                      </div>
+                      <div className="max-h-[300px] overflow-y-auto">
+                        {notifications.map(n => (
+                          <div key={n.id} className="px-6 py-4 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors">
+                            <p className="text-sm font-bold text-white/80">{n.title}</p>
+                            <p className="text-[10px] text-white/30 mt-1">{n.time}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
               
               {currentUser ? (
                 <div 
@@ -1816,7 +1740,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <HospitalsView hospitals={hospitals} />
+              <HospitalsView hospitals={filteredHospitals} onRefresh={fetchDashboardData} />
             </motion.div>
           )}
           {view === 'settings' && (
