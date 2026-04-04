@@ -22,8 +22,22 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
-const WS_URL = `${API_BASE.replace(/^http/, 'ws')}/ws`;
+// Same-origin when unset: Vite dev proxies /api and /ws; production build is served by Express with the API.
+const envApi = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+const API_BASE = envApi ? envApi.replace(/\/$/, '') : '';
+
+function getWebSocketUrl(): string {
+  if (API_BASE) {
+    return `${API_BASE.replace(/^http/, 'ws')}/ws`;
+  }
+  if (typeof window !== 'undefined') {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.host}/ws`;
+  }
+  return 'ws://localhost:3001/ws';
+}
+
+const WS_URL = getWebSocketUrl();
 
 // Custom Icons
 const hospitalIcon = new L.Icon({
@@ -224,7 +238,7 @@ export default function App() {
 
   // URL Auto-Triage & Automated Dispatch logic
   useEffect(() => {
-    // Prevent double-dispatch (important for StrictMode or re-renders)
+    // Prevent double-dispatch
     if (hasAutoDispatched) return;
 
     const params = new URLSearchParams(window.location.search);
@@ -232,43 +246,80 @@ export default function App() {
     const uLat = params.get('lat');
     const uLng = params.get('lng');
 
-    // Show the green realtime location marker if coordinates are passed
-    if (uLat && uLng) {
-      const lat = parseFloat(uLat);
-      const lng = parseFloat(uLng);
-      setUserLocation([lat, lng]);
-      setMapCenter([lat, lng]);
-      setNewPatient(prev => ({ ...prev, lat, lng }));
-    }
-    
-    if (emergencyType && hospitals.length > 0) {
-      let scenarioData = null;
-      if (emergencyType === 'cardiac') {
-        scenarioData = { hr: 145, bp: '90/60', spo2: 92, gcs: 14, symptoms: 'CRITICAL CARDIAC: Severe chest pain, diaphoresis, suspected STEMI' };
-      } else if (emergencyType === 'head') {
-        scenarioData = { hr: 130, bp: '80/50', spo2: 88, gcs: 7, symptoms: 'CRITICAL TRAUMA: Multi-system trauma, MVA, unresponsive' };
-      } else if (emergencyType === 'bleeding') {
-        scenarioData = { hr: 110, bp: '100/70', spo2: 94, gcs: 15, symptoms: 'URGENT BLEEDING: Heavy arterial bleeding, shock, deep laceration' };
-      } else if (emergencyType === 'unconscious') {
-        scenarioData = { hr: 50, bp: '80/40', spo2: 85, gcs: 5, symptoms: 'CRITICAL NEURO: Unconscious person, shallow breathing' };
-      } else if (emergencyType === 'burns') {
-        scenarioData = { hr: 120, bp: '130/90', spo2: 98, gcs: 15, symptoms: 'URGENT BURNS: Severe 3rd degree burns, chemical exposure' };
+    const initializeDispatch = async () => {
+      setHasAutoDispatched(true); // Lock it early to prevent race conditions
+      
+      let finalLat = uLat ? parseFloat(uLat) : userLocation ? userLocation[0] : 18.5204;
+      let finalLng = uLng ? parseFloat(uLng) : userLocation ? userLocation[1] : 73.8567;
+
+      // If no location in URL and no system location, try one last time to locate
+      if (!uLat && !uLng && !userLocation) {
+        try {
+          const pos: any = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 });
+          });
+          finalLat = pos.coords.latitude;
+          finalLng = pos.coords.longitude;
+          setUserLocation([finalLat, finalLng]);
+          console.log("GPS Location acquired via auto-fallback:", finalLat, finalLng);
+        } catch (e) {
+          console.warn("Auto-location fallback failed, using default coordinates.");
+        }
       }
 
-      if (scenarioData) {
-        setHasAutoDispatched(true); // Lock it immediately
-        
-        const finalLat = uLat ? parseFloat(uLat) : 18.5204;
-        const finalLng = uLng ? parseFloat(uLng) : 73.8567;
-        
-        // Update state once
-        setNewPatient(prev => ({ ...prev, ...scenarioData, lat: finalLat, lng: finalLng }));
-        
-        // Dispatch once after dashboard stabilization
-        setTimeout(() => {
-          handleTriageSubmit({ preventDefault: () => {} } as any);
-        }, 1500);
+      setMapCenter([finalLat, finalLng]);
+
+      let scenarioData: any = null;
+      
+      // Fetch "Actual" Vitals from the 200k record dataset
+      try {
+        const risk = (emergencyType === 'cardiac' || emergencyType === 'head' || emergencyType === 'unconscious') ? 'High Risk' : 'Low Risk';
+        const res = await fetch(`${API_BASE}/api/patients/vitals/random?risk=${encodeURIComponent(risk)}`);
+        const data = await res.json();
+        if (data.success && data.data) {
+          const v = data.data;
+          scenarioData = {
+            hr: v.heart_rate,
+            bp: `${v.systolic_bp}/${v.diastolic_bp}`,
+            spo2: v.spo2,
+            gcs: emergencyType === 'head' ? 7 : (emergencyType === 'unconscious' ? 5 : (emergencyType === 'cardiac' ? 12 : 15)),
+            symptoms: `SYSTEM ALERT: Incident detected via ${emergencyType?.toUpperCase() || 'MANUAL'} trigger. Automatic vitals acquisition successful.`,
+            disease: emergencyType === 'cardiac' ? 'CARDIAC ARREST' : 
+                     emergencyType === 'head' ? 'TRAUMATIC INJURY' : 
+                     emergencyType === 'bleeding' ? 'HEAVY BLEEDING' : 
+                     emergencyType === 'unconscious' ? 'UNCONSCIOUS PERSON' : 
+                     emergencyType === 'burns' ? 'SEVERE BURNS' : 'EMERGENCY ALERT',
+            lat: finalLat,
+            lng: finalLng
+          };
+        }
+      } catch (err) {
+        console.error("Vitals acquisition failed, falling back to emergency profiles:", err);
       }
+
+      // Fallback to high-urgency profiles if API fails
+      if (!scenarioData) {
+        const diseaseMap: any = {
+           cardiac: { hr: 145, bp: '90/60', spo2: 92, gcs: 14, disease: 'CARDIAC ARREST' },
+           head: { hr: 130, bp: '80/50', spo2: 88, gcs: 7, disease: 'TRAUMATIC INJURY' },
+           bleeding: { hr: 110, bp: '100/70', spo2: 94, gcs: 15, disease: 'HEAVY BLEEDING' },
+           unconscious: { hr: 50, bp: '80/40', spo2: 85, gcs: 5, disease: 'UNCONSCIOUS PERSON' },
+           burns: { hr: 120, bp: '130/90', spo2: 98, gcs: 15, disease: 'SEVERE BURNS' }
+        };
+        const baseData = diseaseMap[emergencyType || ''] || { hr: 80, bp: '120/80', spo2: 98, gcs: 15, disease: 'EMERGENCY ALERT' };
+        scenarioData = { ...baseData, symptoms: 'PRESET PROTOCOL: Automated dispatch profile loaded.', lat: finalLat, lng: finalLng };
+      }
+
+      setNewPatient(scenarioData);
+      
+      // Auto-submit after UI settles
+      setTimeout(() => {
+        handleTriageSubmit({ preventDefault: () => {} } as any, scenarioData);
+      }, 1000);
+    };
+
+    if (emergencyType && hospitals.length > 0) {
+      initializeDispatch();
     }
   }, [hospitals.length, hasAutoDispatched]);
 
@@ -626,12 +677,14 @@ export default function App() {
   };
 
   // Connect to Backend Prediction & Routing Engine
-  const handleTriageSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleTriageSubmit = async (e: React.FormEvent | null, overrideData?: any) => {
+    if (e) e.preventDefault();
+    
+    const patientSource = overrideData || newPatient;
     
     let systolic_bp = 120, diastolic_bp = 80;
-    if (newPatient.bp && newPatient.bp.includes('/')) {
-      const parts = newPatient.bp.split('/');
+    if (patientSource.bp && patientSource.bp.includes('/')) {
+      const parts = patientSource.bp.split('/');
       systolic_bp = parseInt(parts[0]) || 120;
       diastolic_bp = parseInt(parts[1]) || 80;
     }
@@ -640,16 +693,17 @@ export default function App() {
       incident_id: `INC-${Date.now().toString().slice(-6)}`,
       age: 45, // default
       gender: "unknown",
-      heart_rate: newPatient.hr,
+      heart_rate: patientSource.hr,
       systolic_bp,
       diastolic_bp,
       respiratory_rate: 16,
       temperature: 37.0,
-      spo2: newPatient.spo2,
-      gcs_score: newPatient.gcs,
-      symptoms: newPatient.symptoms ? newPatient.symptoms.split(',').map(s => s.trim()) : [],
-      incident_latitude: newPatient.lat,
-      incident_longitude: newPatient.lng,
+      spo2: patientSource.spo2,
+      gcs_score: patientSource.gcs,
+      disease_name: patientSource.disease,
+      symptoms: patientSource.symptoms ? (typeof patientSource.symptoms === 'string' ? patientSource.symptoms.split(',').map((s: string) => s.trim()) : patientSource.symptoms) : [],
+      incident_latitude: patientSource.lat,
+      incident_longitude: patientSource.lng,
     };
 
     try {
@@ -1032,7 +1086,9 @@ export default function App() {
         speak(errorMsg);
       }
     } catch {
-      const errorMsg = `I cannot reach the dispatch server. Please ensure the backend is active at ${API_BASE}.`;
+      const originHint =
+        API_BASE || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3001');
+      const errorMsg = `I cannot reach the dispatch server. Please ensure the backend is active at ${originHint}.`;
       setChatMessages(prev => [...prev, { sender: 'ai', text: errorMsg }]);
       speak(errorMsg);
     } finally {
@@ -1209,8 +1265,32 @@ export default function App() {
                     placeholder="Enter disease or injury name..." 
                     value={newPatient.disease}
                     onChange={e => setNewPatient({...newPatient, disease: e.target.value})}
-                    className="bg-white border-slate-200 text-slate-900 font-semibold focus:border-blue-500 h-10 px-3 rounded-lg"
+                    className="bg-white border-slate-200 text-slate-900 font-bold focus:border-blue-500 h-10 px-3 rounded-lg shadow-sm"
                   />
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {[
+                      { label: 'Cardiac Arrest', id: 'cardiac' },
+                      { label: 'Head Injury', id: 'head' },
+                      { label: 'Bleeding', id: 'bleeding' },
+                      { label: 'Stroke', id: 'unconscious' },
+                      { label: 'Severe Burns', id: 'burns' }
+                    ].map((badge) => (
+                      <button
+                        key={badge.id}
+                        type="button"
+                        onClick={() => {
+                          if (badge.id === 'cardiac') fillScenario('cardiac');
+                          else if (badge.id === 'head') fillScenario('trauma');
+                          else if (badge.id === 'bleeding') setNewPatient({...newPatient, disease: 'HEAVY BLEEDING', symptoms: 'Arterial bleeding detected'});
+                          else if (badge.id === 'unconscious') setNewPatient({...newPatient, disease: 'STROKE / ACUTE NEURO', symptoms: 'F.A.S.T Positive, unresponsive'});
+                          else setNewPatient({...newPatient, disease: 'SEVERE BURNS', symptoms: 'Third degree burns recorded'});
+                        }}
+                        className="text-[9px] font-black uppercase tracking-wider px-2 py-1 bg-slate-100 text-slate-500 border border-slate-200 rounded-md hover:bg-blue-600 hover:text-white hover:border-blue-700 transition-all active:scale-95"
+                      >
+                        + {badge.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="space-y-3">
