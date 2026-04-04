@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { Activity, Clock, MapPin, Navigation, ShieldAlert, CheckCircle2, Zap, MousePointerClick, HeartPulse, Car, UserCheck, Crosshair, Loader2, ExternalLink, Bot, Mic, MicOff, Send, X, AlertTriangle, Camera, Scan, Maximize2, Minimize2, Square } from 'lucide-react';
+import { Activity, Clock, MapPin, Navigation, ShieldAlert, CheckCircle2, Zap, MousePointerClick, HeartPulse, Car, UserCheck, Crosshair, Loader2, ExternalLink, Bot, Mic, MicOff, Send, X, AlertTriangle, Camera, Scan, Maximize2, Minimize2, Square, Ambulance, Hospital as HospitalIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Button } from './components/ui/button';
 import { Badge } from './components/ui/badge';
@@ -206,11 +206,71 @@ export default function App() {
   // Scene Vision AI State
   const [scenePhoto, setScenePhoto] = useState<string | null>(null);
   const [isScanningPhoto, setIsScanningPhoto] = useState(false);
-  const [visionAnalysis, setVisionAnalysis] = useState<{ traumaLevel: string; override: boolean; reason: string } | null>(null);
+  const [visionAnalysis, setVisionAnalysis] = useState<{ 
+    traumaLevel: string; 
+    override: boolean; 
+    reason: string;
+    impactScore?: number;
+    impactLevel?: string;
+    facilityRequired?: string;
+    aiBriefDescription?: string;
+  } | null>(null);
+  const [goldenHourTimer, setGoldenHourTimer] = useState<number | null>(null); // Seconds remaining
+
   const [mobilenetModel, setMobilenetModel] = useState<any>(null);
   const [isModelLoading, setIsModelLoading] = useState(true);
   const [hasAutoDispatched, setHasAutoDispatched] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // URL Auto-Triage & Automated Dispatch logic
+  useEffect(() => {
+    // Prevent double-dispatch (important for StrictMode or re-renders)
+    if (hasAutoDispatched) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const emergencyType = params.get('emergency');
+    const uLat = params.get('lat');
+    const uLng = params.get('lng');
+
+    // Show the green realtime location marker if coordinates are passed
+    if (uLat && uLng) {
+      const lat = parseFloat(uLat);
+      const lng = parseFloat(uLng);
+      setUserLocation([lat, lng]);
+      setMapCenter([lat, lng]);
+      setNewPatient(prev => ({ ...prev, lat, lng }));
+    }
+    
+    if (emergencyType && hospitals.length > 0) {
+      let scenarioData = null;
+      if (emergencyType === 'cardiac') {
+        scenarioData = { hr: 145, bp: '90/60', spo2: 92, gcs: 14, symptoms: 'CRITICAL CARDIAC: Severe chest pain, diaphoresis, suspected STEMI' };
+      } else if (emergencyType === 'head') {
+        scenarioData = { hr: 130, bp: '80/50', spo2: 88, gcs: 7, symptoms: 'CRITICAL TRAUMA: Multi-system trauma, MVA, unresponsive' };
+      } else if (emergencyType === 'bleeding') {
+        scenarioData = { hr: 110, bp: '100/70', spo2: 94, gcs: 15, symptoms: 'URGENT BLEEDING: Heavy arterial bleeding, shock, deep laceration' };
+      } else if (emergencyType === 'unconscious') {
+        scenarioData = { hr: 50, bp: '80/40', spo2: 85, gcs: 5, symptoms: 'CRITICAL NEURO: Unconscious person, shallow breathing' };
+      } else if (emergencyType === 'burns') {
+        scenarioData = { hr: 120, bp: '130/90', spo2: 98, gcs: 15, symptoms: 'URGENT BURNS: Severe 3rd degree burns, chemical exposure' };
+      }
+
+      if (scenarioData) {
+        setHasAutoDispatched(true); // Lock it immediately
+        
+        const finalLat = uLat ? parseFloat(uLat) : 18.5204;
+        const finalLng = uLng ? parseFloat(uLng) : 73.8567;
+        
+        // Update state once
+        setNewPatient(prev => ({ ...prev, ...scenarioData, lat: finalLat, lng: finalLng }));
+        
+        // Dispatch once after dashboard stabilization
+        setTimeout(() => {
+          handleTriageSubmit({ preventDefault: () => {} } as any);
+        }, 1500);
+      }
+    }
+  }, [hospitals.length, hasAutoDispatched]);
 
   useEffect(() => {
      setAvailableAmbulances(generateAmbulances(18.5204, 73.8567));
@@ -256,22 +316,49 @@ export default function App() {
             );
             const topLabel = predictions[0].className;
             const prob = (predictions[0].probability * 100).toFixed(1) + '%';
+            
+            // GenAI Simulation Score & Impact
+            const impactScore = isHighSeverity ? Math.floor(Math.random() * 20) + 80 : Math.floor(Math.random() * 40) + 10;
+            const impactLevel = impactScore > 75 ? 'HIGH IMPACT (CRITICAL)' : impactScore > 40 ? 'MODERATE IMPACT' : 'LOW IMPACT';
+            const facilityRequired = isHighSeverity ? 'Level 1 Trauma Center (Neuro + Cath Lab)' : 'Standard Emergency Department';
+
             if (isHighSeverity) {
-              setVisionAnalysis({ traumaLevel: 'LEVEL_1_TRAUMA', override: true, reason: `Critical Vision Alert: "${topLabel}" detected (${prob} confidence). High-severity vehicle scene. Overriding routing to Level 1 Trauma Center.` });
+              const aiBriefDescription = `Scene Scan: ${topLabel} incident. Environmental conditions suggest moderate obstruction. Identified risk factors: High kinetic energy localized to ${topLabel}. Potential multi-system trauma.`;
+              
+              setVisionAnalysis({ 
+                traumaLevel: 'LEVEL_1_TRAUMA', 
+                override: true, 
+                reason: `GenAI Insight: "${topLabel}" detected (${prob} confidence). ${impactLevel} detected.`,
+                impactScore,
+                impactLevel,
+                facilityRequired,
+                aiBriefDescription
+              });
               
               // Set critical vitals automatically
-              setNewPatient(prev => ({ ...prev, hr: 130, bp: '90/60', spo2: 92, gcs: 8, symptoms: 'Unresponsive, crash trauma, vehicle collision (Vision Detected)' }));
+              setNewPatient(prev => ({ ...prev, hr: 130, bp: '90/60', spo2: 92, gcs: 8, disease: topLabel.toUpperCase() + ' COLLISION', symptoms: `CRITICAL TRAUMA: ${topLabel} accident. Impact Score: ${impactScore}/100. Facility: ${facilityRequired}` }));
               
               // Auto-dispatch if location is already set
               if (userLocation || (newPatient.lat !== 18.5204)) {
-                setTimeout(() => triggerSOS(), 1000);
+                setTimeout(() => {
+                   handleTriageSubmit({ preventDefault: () => {} } as any);
+                }, 1500);
                 setHasAutoDispatched(true);
               }
             } else {
-              setVisionAnalysis({ traumaLevel: 'STANDARD', override: false, reason: `Scan complete: "${topLabel}" detected (${prob} confidence). No high-severity trauma signatures found. Standard routing applies.` });
+              const aiBriefDescription = `Scene Scan: Standard ${topLabel} observation. No immediate massive trauma indicators found. Routine response suggested.`;
+              setVisionAnalysis({ 
+                traumaLevel: 'STANDARD', 
+                override: false, 
+                reason: `Scan complete: "${topLabel}" detected (${prob} confidence). ${impactLevel} observed.`,
+                impactScore,
+                impactLevel,
+                facilityRequired,
+                aiBriefDescription
+              });
             }
           } catch (err) {
-            setVisionAnalysis({ traumaLevel: 'ERROR', override: false, reason: 'Vision model failed to analyze image. Proceed with manual triage.' });
+            setVisionAnalysis({ traumaLevel: 'ERROR', override: false, reason: 'Vision model failed to analyze image.' } as any);
           }
         }
         setIsScanningPhoto(false);
@@ -427,9 +514,25 @@ export default function App() {
     return () => clearInterval(timer);
   }, [hospitals]);
   
+  // Golden Hour Timer Tick
+  useEffect(() => {
+    if (goldenHourTimer === null || goldenHourTimer <= 0) return;
+    const interval = setInterval(() => {
+      setGoldenHourTimer(prev => (prev !== null && prev > 0 ? prev - 1 : null));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [goldenHourTimer]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  
   // Form State
   const [newPatient, setNewPatient] = useState({
-    hr: 80, bp: '120/80', spo2: 98, gcs: 15, symptoms: '', lat: 18.5204, lng: 73.8567
+    hr: 80, bp: '120/80', spo2: 98, gcs: 15, symptoms: '', lat: 18.5204, lng: 73.8567, disease: ''
   });
 
   const selectedPatient = patients.find(p => p.id === selectedPatientId);
@@ -447,6 +550,7 @@ export default function App() {
           : type === 'trauma'
           ? 'Multi-system trauma, MVA, unresponsive'
           : 'Minor laceration, bleeding controlled';
+        const disease = type === 'cardiac' ? 'ACUTE MI' : type === 'trauma' ? 'TRAUMATIC INJURY' : 'LACERATION';
         setNewPatient({
           ...newPatient,
           hr: v.heart_rate,
@@ -454,13 +558,14 @@ export default function App() {
           spo2: v.spo2,
           gcs: type === 'trauma' ? 7 : type === 'cardiac' ? 13 : 15,
           symptoms,
+          disease
         });
       }
     } catch (e) {
       // Fallback to hardcoded if backend is down
-      if (type === 'cardiac') setNewPatient({ ...newPatient, hr: 145, bp: '90/60', spo2: 92, gcs: 14, symptoms: 'Severe chest pain, diaphoresis, suspected STEMI' });
-      if (type === 'trauma') setNewPatient({ ...newPatient, hr: 130, bp: '80/50', spo2: 88, gcs: 7, symptoms: 'Multi-system trauma, MVA, unresponsive' });
-      if (type === 'stable') setNewPatient({ ...newPatient, hr: 80, bp: '120/80', spo2: 99, gcs: 15, symptoms: 'Minor laceration to arm, bleeding controlled' });
+      if (type === 'cardiac') setNewPatient({ ...newPatient, hr: 145, bp: '90/60', spo2: 92, gcs: 14, symptoms: 'Severe chest pain, diaphoresis, suspected STEMI', disease: 'ACUTE MI' });
+      if (type === 'trauma') setNewPatient({ ...newPatient, hr: 130, bp: '80/50', spo2: 88, gcs: 7, symptoms: 'Multi-system trauma, MVA, unresponsive', disease: 'TRAUMATIC INJURY' });
+      if (type === 'stable') setNewPatient({ ...newPatient, hr: 80, bp: '120/80', spo2: 99, gcs: 15, symptoms: 'Minor laceration to arm, bleeding controlled', disease: 'LACERATION' });
     }
   };
 
@@ -624,8 +729,14 @@ export default function App() {
 
         setPatients(prev => [newPatientRecord, ...prev]);
         setSelectedPatientId(newPatientRecord.id);
+        
+        // Start Golden Hour Timer if Level 1 Trauma
+        if (visionAnalysis?.traumaLevel === 'LEVEL_1_TRAUMA' || severityClass === 'Critical') {
+          setGoldenHourTimer(3600); // 60 minutes
+        }
+
         setMapCenter([newPatientRecord.lat, newPatientRecord.lng]);
-        setNewPatient(prev => ({ ...prev, symptoms: '' }));
+        setNewPatient(prev => ({ ...prev, symptoms: '', disease: '' }));
         
         // Refresh hospitals to get updated load/capacity
         const hRes = await fetch(`${API_BASE}/api/hospitals`);
@@ -812,6 +923,10 @@ export default function App() {
 
         setPatients(prev => [newPatientRecord, ...prev]);
         setSelectedPatientId(newPatientRecord.id);
+        
+        // Start Golden Hour Timer
+        setGoldenHourTimer(3600);
+
         setMapCenter([lat, lng]);
 
         // Refresh hospitals
@@ -917,25 +1032,21 @@ export default function App() {
     : hospitals;
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans overflow-hidden">
+    <div className="h-screen w-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden font-sans">
       {/* Header */}
-      <header className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-md z-10 shrink-0">
+      <header className="h-16 shrink-0 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-20 shadow-sm">
         <div className="flex items-center space-x-3">
-          <div className="relative">
-            <Activity className="text-red-500 h-6 w-6" />
-            <span className="absolute -top-1 -right-1 flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-            </span>
+          <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg">
+            <Zap className="h-6 w-6" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight">GoldenHour Dispatch</h1>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">GoldenHour Dispatch</h1>
         </div>
         <div className="flex items-center space-x-6">
-          <div className="flex items-center space-x-3 bg-slate-800 px-4 py-2 rounded-lg border border-slate-700">
-            <span className="text-sm font-medium text-slate-300">Mass Casualty Protocol</span>
+          <div className="flex items-center space-x-3 bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Mass Casualty Protocol</span>
             <button 
               onClick={() => setIsMassCasualty(!isMassCasualty)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-slate-900 ${isMassCasualty ? 'bg-red-500' : 'bg-slate-600'}`}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white ${isMassCasualty ? 'bg-red-500' : 'bg-slate-300'}`}
             >
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isMassCasualty ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
@@ -944,15 +1055,15 @@ export default function App() {
           <Button 
             variant="outline"
             onClick={simulateRoadClosure} 
-            className="hidden sm:flex bg-amber-900 border-amber-600 text-amber-400 hover:bg-amber-800 hover:text-amber-300 text-xs h-9 tracking-wide"
+            className="hidden sm:flex bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 text-xs h-10 rounded-xl tracking-wide"
           >
-            <AlertTriangle className="mr-2 h-4 w-4 text-amber-400" />
-            Mid-Journey Roadblock Sim
+            <AlertTriangle className="mr-2 h-4 w-4" />
+            Roadblock Sim
           </Button>
 
-          <div className="text-sm bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 flex items-center gap-2 ml-2">
-            <span className="text-slate-400">Active Units:</span>
-            <span className="font-bold text-red-400 text-lg leading-none">{patients.length}</span>
+          <div className="text-sm bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl flex items-center gap-2">
+            <span className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Active Units:</span>
+            <span className="font-bold text-blue-600 text-lg leading-none">{patients.length}</span>
           </div>
         </div>
       </header>
@@ -961,73 +1072,97 @@ export default function App() {
         {/* Left Sidebar - Triage Input */}
         <div className="w-[380px] bg-white border-r border-gray-200 flex flex-col shadow-sm z-10 shrink-0">
           
-          <div className="p-4 border-b bg-slate-50">
-            <h2 className="font-semibold text-lg flex items-center gap-2 mb-3">
-              <Zap className="h-5 w-5 text-amber-500" />
-              Quick Scenarios
+          <div className="p-4 border-b">
+            <h2 className="font-semibold text-lg flex items-center gap-2 mb-4">
+              <Activity className="h-5 w-5 text-blue-500" />
+              Triage Intelligence
             </h2>
             <div className="grid grid-cols-3 gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => fillScenario('cardiac')} className="text-xs h-auto py-2 flex flex-col gap-1 border-red-200 hover:bg-red-50 hover:text-red-700">
-                <HeartPulse className="h-4 w-4 text-red-500" />
-                Cardiac
+              <Button type="button" variant="outline" size="sm" onClick={() => fillScenario('cardiac')} className="flex flex-col gap-1 h-auto py-2 hover:bg-red-50 hover:border-red-200 group transition-all duration-200">
+                <HeartPulse className="h-4 w-4 text-red-500 group-hover:scale-110" />
+                <span className="text-[10px]">Cardiac</span>
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => fillScenario('trauma')} className="text-xs h-auto py-2 flex flex-col gap-1 border-orange-200 hover:bg-orange-50 hover:text-orange-700">
-                <Car className="h-4 w-4 text-orange-500" />
-                Trauma
+              <Button type="button" variant="outline" size="sm" onClick={() => fillScenario('trauma')} className="flex flex-col gap-1 h-auto py-2 hover:bg-orange-50 hover:border-orange-200 group transition-all duration-200">
+                <Car className="h-4 w-4 text-orange-500 group-hover:scale-110" />
+                <span className="text-[10px]">Trauma</span>
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => fillScenario('stable')} className="text-xs h-auto py-2 flex flex-col gap-1 border-green-200 hover:bg-green-50 hover:text-green-700">
-                <UserCheck className="h-4 w-4 text-green-500" />
-                Stable
+              <Button type="button" variant="outline" size="sm" onClick={() => fillScenario('stable')} className="flex flex-col gap-1 h-auto py-2 hover:bg-green-50 hover:border-green-200 group transition-all duration-200">
+                <UserCheck className="h-4 w-4 text-green-500 group-hover:scale-110" />
+                <span className="text-[10px]">Stable</span>
               </Button>
             </div>
           </div>
 
-          <div className="p-4 overflow-y-auto flex-1">
-            <form id="triageForm" onSubmit={handleTriageSubmit} className="space-y-5">
+          <div className="p-5 overflow-y-auto flex-1 space-y-6">
+            <form id="triageForm" onSubmit={handleTriageSubmit} className="space-y-6">
 
               {/* Scene Photo AI Vision */}
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold flex items-center gap-2">
-                  <Camera className="h-4 w-4 text-purple-600" />
-                  Scene Photo Analysis
-                  {isModelLoading && <span className="ml-auto text-[10px] text-purple-400 font-normal flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Loading AI model...</span>}
-                  {!isModelLoading && !scenePhoto && <span className="ml-auto text-[10px] text-green-500 font-normal">✓ Model Ready</span>}
+              <div className="space-y-3">
+                <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Camera className="h-3.5 w-3.5 text-blue-500" />
+                    Scene Photo Analysis
+                  </div>
+                  {isModelLoading && <span className="text-blue-500/60 font-normal flex items-center gap-1 animate-pulse"><Loader2 className="h-3 w-3 animate-spin" />Booting Model...</span>}
+                  {!isModelLoading && !scenePhoto && <span className="text-emerald-500/60 font-bold tracking-tighter">AI READY</span>}
                 </Label>
                 <input type="file" ref={fileInputRef} accept="image/*" className="hidden" onChange={handleImageUpload} />
                 {!scenePhoto ? (
                   <Button type="button" variant="outline" disabled={isModelLoading}
-                    className="w-full border-dashed border-2 border-purple-200 hover:bg-purple-50 text-purple-700 h-14"
+                    className="w-full border-dashed border-2 bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-400 h-20 rounded-xl transition-all"
                     onClick={() => fileInputRef.current?.click()}>
-                    <Camera className="h-4 w-4 mr-2 text-purple-500" />
-                    {isModelLoading ? 'Initializing TensorFlow...' : 'Snap or Upload Scene Photo'}
+                    <Camera className="h-5 w-5 mr-3 text-blue-400" />
+                    <div className="text-left">
+                      <div className="text-xs font-bold text-slate-700">Snap Incident Photo</div>
+                      <div className="text-[10px] text-slate-400 font-medium">Auto-Triage Scenerey Recognition</div>
+                    </div>
                   </Button>
                 ) : (
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-2 relative">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 relative overflow-hidden group">
                     {isScanningPhoto ? (
-                      <div className="flex items-center justify-center gap-3 p-3">
-                        <Scan className="h-5 w-5 text-purple-500 animate-spin" />
-                        <span className="text-xs text-purple-700 font-medium animate-pulse">Running TensorFlow MobileNetV2...</span>
+                      <div className="flex flex-col items-center justify-center gap-3 p-4">
+                        <Scan className="h-8 w-8 text-blue-500 animate-pulse" />
+                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] animate-pulse">Running Neural Scan...</span>
                       </div>
                     ) : (
-                      <div className="flex bg-white p-2 rounded-md shadow-sm border border-purple-100 items-start gap-3">
-                        <div className="w-14 h-14 rounded-md overflow-hidden relative shrink-0">
+                      <div className="flex items-start gap-4">
+                        <div className="w-20 h-20 rounded-lg overflow-hidden relative shrink-0 border border-slate-200">
                           <img src={scenePhoto} alt="scene" className="w-full h-full object-cover" />
-                          <div className={`absolute inset-0 border-[3px] rounded-md ${visionAnalysis?.override ? 'border-red-500 animate-pulse' : 'border-green-400'}`}></div>
+                          <div className={`absolute inset-0 border-[3px] rounded-lg ${visionAnalysis?.override ? 'border-red-500 animate-pulse' : 'border-emerald-500'}`}></div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-1">
+                        <div className="flex-1 min-w-0 py-1">
+                          <div className="flex items-center gap-1.5 mb-2">
                             {visionAnalysis?.override
-                              ? <AlertTriangle className="h-3 w-3 text-red-500 shrink-0" />
-                              : <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" />}
-                            <h4 className={`font-bold text-[10px] uppercase tracking-wide ${visionAnalysis?.override ? 'text-red-600' : 'text-green-600'}`}>
-                              {visionAnalysis?.traumaLevel === 'LEVEL_1_TRAUMA' ? 'HIGH SEVERITY — Override Active' : visionAnalysis?.traumaLevel === 'ERROR' ? 'Scan Error' : 'Standard Scene'}
+                               ? <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                               : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
+                            <h4 className={`font-black text-[10px] uppercase tracking-widest ${visionAnalysis?.override ? 'text-red-500' : 'text-emerald-500'}`}>
+                              {visionAnalysis?.traumaLevel === 'LEVEL_1_TRAUMA' ? 'CRITICAL DETECTED' : 'STANDARD SCENE'}
                             </h4>
                           </div>
-                          <p className="text-[10px] text-slate-600 leading-tight">{visionAnalysis?.reason}</p>
-                          {visionAnalysis?.override && <Badge variant="destructive" className="mt-1 text-[9px] py-0 px-1">Level 1 Trauma Override</Badge>}
+                          <p className="text-[10px] text-slate-600 font-medium leading-relaxed italic">"{visionAnalysis?.reason}"</p>
+                          
+                          <div className="mt-2 p-2 bg-blue-50/50 rounded-lg border border-blue-100/50">
+                            <h5 className="text-[9px] font-bold text-blue-700 uppercase mb-1 flex items-center gap-1">
+                              <Bot className="h-3 w-3" /> AI Observation Brief
+                            </h5>
+                            <p className="text-[9px] text-blue-800 leading-tight leading-relaxed">{visionAnalysis?.aiBriefDescription}</p>
+                          </div>
+                          
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {visionAnalysis?.impactScore && (
+                              <Badge key="impact" variant="outline" className={`text-[9px] py-0.5 px-2 font-black border-slate-200 ${visionAnalysis?.impactScore > 70 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                IMPACT: {visionAnalysis.impactScore}/100
+                              </Badge>
+                            )}
+                            {visionAnalysis?.facilityRequired && (
+                              <Badge key="facility" variant="outline" className="text-[9px] py-0.5 px-2 bg-blue-50 border-blue-100 text-blue-600 font-black">
+                                REQ: {visionAnalysis.facilityRequired}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                        <button type="button" onClick={() => { setScenePhoto(null); setVisionAnalysis(null); }} className="shrink-0 text-gray-400 hover:text-red-500">
-                          <X className="h-3.5 w-3.5" />
+                        <button type="button" onClick={() => { setScenePhoto(null); setVisionAnalysis(null); }} className="shrink-0 text-slate-300 hover:text-red-500 transition-colors">
+                          <X className="h-4 w-4" />
                         </button>
                       </div>
                     )}
@@ -1035,226 +1170,120 @@ export default function App() {
                 )}
               </div>
 
-              {visionAnalysis?.override ? (
-                <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-red-600 p-2 rounded-lg shadow-lg">
-                      <AlertTriangle className="h-6 w-6 text-white animate-pulse" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-red-900 leading-none">LEVEL 1 EMERGENCY</h3>
-                      <p className="text-[10px] text-red-700 font-semibold uppercase tracking-wider mt-0.5">Vision AI Override Active</p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <div className="bg-white/80 backdrop-blur-sm p-3 rounded-lg border border-red-100 shadow-sm">
-                      <Label className="text-[10px] font-bold text-red-800 uppercase flex items-center gap-1.5 mb-1.5">
-                        <MapPin className="h-3 w-3" /> Incident Location
-                      </Label>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleUseGPS}
-                          disabled={gpsLoading}
-                          className="flex-1 h-9 bg-white border-red-200 text-red-700 hover:bg-red-50"
-                        >
-                          {gpsLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Crosshair className="h-4 w-4 mr-2" />}
-                          GPS
-                        </Button>
-                        <div className="flex-1 flex items-center justify-center text-[10px] font-bold text-slate-500 border border-dashed rounded-md bg-slate-50 px-2 text-center leading-tight">
-                          Or click map to set location
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Primary Complaint / Disease</Label>
+                  <Input 
+                    placeholder="Enter disease or injury name..." 
+                    value={newPatient.disease}
+                    onChange={e => setNewPatient({...newPatient, disease: e.target.value})}
+                    className="bg-white border-slate-200 text-slate-900 font-semibold focus:border-blue-500 h-10 px-3 rounded-lg"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Clinical Vitals</Label>
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Heart Rate</label>
+                        <div className="relative">
+                          <Input type="number" value={newPatient.hr || ''} onChange={e => setNewPatient({...newPatient, hr: parseInt(e.target.value)})} className="bg-white border-slate-200 text-blue-600 font-bold focus:border-blue-500 h-10 px-3 pr-10 rounded-lg" />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">BPM</span>
                         </div>
                       </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Blood Pressure</label>
+                        <Input value={newPatient.bp} onChange={e => setNewPatient({...newPatient, bp: e.target.value})} className="bg-white border-slate-200 text-slate-900 font-bold focus:border-blue-500 h-10 px-3 rounded-lg" />
+                      </div>
                     </div>
-
-                    <div className="bg-white/60 p-3 rounded-lg border border-red-50">
-                      <p className="text-[11px] text-red-800 leading-relaxed font-medium italic">
-                        "{visionAnalysis.reason}"
-                      </p>
-                    </div>
-
-                    <Button 
-                      type="button" 
-                      variant="destructive"
-                      onClick={triggerSOS}
-                      disabled={sosActive || !(userLocation || newPatient.lat !== 18.5204)}
-                      className="w-full h-14 bg-red-600 hover:bg-red-700 text-white font-black text-lg tracking-widest shadow-xl ring-4 ring-red-100 animate-bounce-subtle"
-                    >
-                      {sosActive ? 'DISPATCHING...' : hasAutoDispatched ? 'DISPATCHED' : 'INSTANT DISPATCH'}
-                    </Button>
-                    
-                    {!hasAutoDispatched && !(userLocation || newPatient.lat !== 18.5204) && (
-                      <p className="text-[10px] text-red-600 font-bold text-center animate-pulse">
-                        ⚠ Please verify location on map to activate dispatch
-                      </p>
-                    )}
                   </div>
-                  
-                  <button 
-                    type="button"
-                    onClick={() => { setVisionAnalysis(null); setScenePhoto(null); setHasAutoDispatched(false); }}
-                    className="w-full text-[10px] font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest pt-2"
-                  >
-                    Cancel Override & Return to Manual Triage
-                  </button>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">SpO2 Level</label>
+                      <div className="relative">
+                        <Input type="number" value={newPatient.spo2 || ''} onChange={e => setNewPatient({...newPatient, spo2: parseInt(e.target.value)})} className="bg-white border-slate-200 text-emerald-600 font-bold focus:border-blue-500 h-10 px-3 pr-8 rounded-lg" />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">GCS Score</label>
+                      <Input type="number" value={newPatient.gcs || ''} onChange={e => setNewPatient({...newPatient, gcs: parseInt(e.target.value)})} className="bg-white border-slate-200 text-red-600 font-bold focus:border-blue-500 h-10 px-3 rounded-lg" />
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="symptoms" className="text-sm font-semibold">Reported Symptoms</Label>
-                    <Input 
-                      id="symptoms" 
-                      placeholder="e.g., Severe chest pain, shortness of breath" 
-                      value={newPatient.symptoms}
-                      onChange={e => setNewPatient({...newPatient, symptoms: e.target.value})}
-                      required
-                      className="bg-gray-50"
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border">
-                    <div className="space-y-1">
-                      <Label htmlFor="hr" className="text-xs font-semibold text-slate-600">Heart Rate</Label>
-                      <div className="flex items-center gap-2">
-                        <Input id="hr" type="number" value={newPatient.hr} onChange={e => setNewPatient({...newPatient, hr: parseInt(e.target.value)})} className="h-8" />
-                        <span className="text-xs text-slate-400 w-8">bpm</span>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="bp" className="text-xs font-semibold text-slate-600">Blood Pressure</Label>
-                      <div className="flex items-center gap-2">
-                        <Input id="bp" value={newPatient.bp} onChange={e => setNewPatient({...newPatient, bp: e.target.value})} className="h-8" />
-                        <span className="text-xs text-slate-400 w-8">mmHg</span>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="spo2" className="text-xs font-semibold text-slate-600">SpO2</Label>
-                      <div className="flex items-center gap-2">
-                        <Input id="spo2" type="number" value={newPatient.spo2} onChange={e => setNewPatient({...newPatient, spo2: parseInt(e.target.value)})} className="h-8" />
-                        <span className="text-xs text-slate-400 w-8">%</span>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="gcs" className="text-xs font-semibold text-slate-600">GCS Score</Label>
-                      <div className="flex items-center gap-2">
-                        <Input id="gcs" type="number" min="3" max="15" value={newPatient.gcs} onChange={e => setNewPatient({...newPatient, gcs: parseInt(e.target.value)})} className="h-8" />
-                        <span className="text-xs text-slate-400 w-8">/15</span>
-                      </div>
-                    </div>
-                  </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-blue-500" /> 
-                      Incident Location
-                    </Label>
-                    <div className="flex gap-2">
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-3 text-sm text-blue-800 flex-1">
-                        <MousePointerClick className="h-5 w-5 text-blue-500 shrink-0 animate-pulse" />
-                        <span className="flex-1 text-xs">Click map or use GPS</span>
+              <div className="space-y-3">
+                <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Incident Location</Label>
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
+                   <div className="flex items-center gap-3">
+                      <div className="flex-1 bg-white border border-slate-200 px-4 py-3 rounded-lg text-xs text-slate-500 font-medium italic flex items-center gap-2">
+                        <MapPin className="h-3.5 w-3.5 text-blue-500" />
+                         Click map or utilize GPS
                       </div>
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
                         onClick={handleUseGPS}
                         disabled={gpsLoading}
-                        className="h-auto px-3 py-2 flex flex-col items-center gap-1 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 text-emerald-600 shrink-0"
+                        className="h-12 w-12 flex items-center justify-center bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100 rounded-lg"
                       >
-                        {gpsLoading ? (
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <Crosshair className="h-5 w-5" />
-                        )}
-                        <span className="text-[10px] font-semibold">{gpsLoading ? 'Locating...' : 'Use GPS'}</span>
+                        {gpsLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Crosshair className="h-5 w-5" />}
                       </Button>
                     </div>
                     {userLocation && (
-                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 flex items-center gap-2 text-xs text-emerald-700">
-                        <Crosshair className="h-3.5 w-3.5 shrink-0" />
-                        <span>GPS location acquired: {userLocation[0].toFixed(4)}, {userLocation[1].toFixed(4)}</span>
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center gap-3 text-[11px] text-emerald-700 font-medium">
+                        <CheckCircle2 className="h-4 w-4 bg-emerald-500 text-white rounded-full" />
+                        <span>TACTICAL GPS LOCK: {userLocation[0].toFixed(5)}, {userLocation[1].toFixed(5)}</span>
                       </div>
                     )}
-                    <div className="grid grid-cols-2 gap-2 opacity-50 pointer-events-none">
-                      <Input value={newPatient.lat.toFixed(4)} readOnly className="h-8 text-xs bg-gray-100" />
-                      <Input value={newPatient.lng.toFixed(4)} readOnly className="h-8 text-xs bg-gray-100" />
-                    </div>
-                  </div>
+                </div>
+              </div>
 
-                  <Button type="submit" size="lg" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md">
-                    <Navigation className="mr-2 h-4 w-4" />
-                    Predict Needs & Route Unit
-                  </Button>
-                </>
-              )}
+              <Button type="submit" size="lg" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-6 rounded-xl shadow-lg transition-all duration-200 active:scale-95 flex items-center justify-center gap-2">
+                <Zap className="h-5 w-5" />
+                Initialize Predictive Mission
+              </Button>
+
             </form>
 
-            <div className="mt-8">
-              <h3 className="font-semibold text-xs text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Activity className="h-4 w-4" />
-                Active Transports
+            <div className="mt-10 border-t border-slate-200 pt-8">
+              <h3 className="font-bold text-[10px] text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                <Activity className="h-4 w-4 text-blue-500" />
+                Live Mission Feed
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <AnimatePresence>
                   {patients.map(p => (
                     <motion.div 
                       key={p.id}
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, scale: 0.95 }}
                       onClick={() => handlePatientSelect(p)}
-                      className={`p-3 rounded-xl border cursor-pointer transition-all duration-200 ${selectedPatientId === p.id ? 'bg-blue-50 border-blue-400 shadow-sm ring-1 ring-blue-400' : 'bg-white hover:bg-gray-50 border-gray-200 hover:border-gray-300'}`}
+                      className={`p-3 rounded-xl border-l-4 cursor-pointer transition-all duration-200 mb-3 shadow-sm ${selectedPatientId === p.id ? 'bg-blue-50 border-blue-500 shadow-blue-100' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}
                     >
                       <div className="flex justify-between items-start mb-2">
-                        <span className="font-bold text-sm text-slate-800">Unit {p.id}</span>
-                        <Badge variant={p.severity === 'Critical' ? 'destructive' : p.severity === 'Urgent' ? 'warning' : 'success'} className="shadow-sm">
+                        <div className="text-xs font-bold text-slate-800">Mission {p.id}</div>
+                        <Badge variant={p.severity === 'Critical' ? 'destructive' : 'outline'} className="text-[10px] py-0 px-1.5">
                           {p.severity}
                         </Badge>
                       </div>
-                      <div className="text-xs text-gray-600 line-clamp-2 mb-3">{p.symptoms}</div>
-                      <div className="text-[11px] font-semibold text-blue-700 flex items-center gap-1.5 bg-blue-50/50 p-2 rounded-md border border-blue-200 shadow-sm">
-                        <Navigation className="h-3 w-3 shrink-0" />
-                        <span className="truncate">To: {hospitals.find(h => h.id === p.assignedHospitalId)?.name || 'Pending'}</span>
+                      <div className="text-xs text-slate-500 line-clamp-1 mb-2 font-medium italic opacity-80">"{p.symptoms}"</div>
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-blue-700 bg-white border border-blue-100 px-2 py-1 rounded-md">
+                        <Navigation className="h-3 w-3" />
+                        <span className="truncate">Dest: {hospitals.find(h => h.id === p.assignedHospitalId)?.name || 'Matching...'}</span>
                       </div>
                     </motion.div>
                   ))}
-                </AnimatePresence>
-              </div>
-            </div>
-
-            {/* Available Ambulances Nearby */}
-            <div className="mt-8 border-t pt-5">
-              <h3 className="font-semibold text-xs text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Car className="h-4 w-4" />
-                Available Units Nearby
-              </h3>
-              <div className="space-y-2">
-                {availableAmbulances.slice().sort((a, b) => {
-                  const distA = Math.sqrt(Math.pow(a.lat - newPatient.lat, 2) + Math.pow(a.lng - newPatient.lng, 2));
-                  const distB = Math.sqrt(Math.pow(b.lat - newPatient.lat, 2) + Math.pow(b.lng - newPatient.lng, 2));
-                  return distA - distB;
-                }).map(a => {
-                  const dist = Math.sqrt(Math.pow(a.lat - newPatient.lat, 2) + Math.pow(a.lng - newPatient.lng, 2));
-                  const eta = Math.max(1, Math.round(dist * 111 * 1.5)); // rough simulation
-                  return (
-                    <div key={a.id} className="bg-white border border-gray-200 rounded-xl p-3 flex justify-between items-center hover:bg-slate-50 transition-colors shadow-sm">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-emerald-50 border border-emerald-100 text-emerald-700 p-1.5 rounded-lg shadow-sm text-base">🚑</div>
-                        <div>
-                          <div className="font-bold text-sm text-slate-800">{a.id}</div>
-                          <div className="text-[11px] text-slate-500 font-medium">{eta} min away</div>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-200 bg-emerald-50 font-semibold shadow-sm">Available</Badge>
+                  {patients.length === 0 && (
+                    <div className="py-12 flex flex-col items-center justify-center text-center">
+                       <ShieldAlert className="h-10 w-10 text-slate-200 mb-4" />
+                       <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">No Active Missions</div>
                     </div>
-                  );
-                })}
-                {availableAmbulances.length === 0 && (
-                  <div className="p-3 text-center text-xs text-slate-400 border border-dashed rounded-lg">No idle units available.</div>
-                )}
+                  )}
+                </AnimatePresence>
               </div>
             </div>
 
@@ -1262,8 +1291,8 @@ export default function App() {
         </div>
 
         {/* Center - Map */}
-        <div className="flex-1 relative z-0 bg-slate-100">
-          <MapContainer center={[18.5204, 73.8567]} zoom={12} className="h-full w-full">
+        <div className="flex-1 relative z-0">
+          <MapContainer center={[18.5204, 73.8567]} zoom={13} className="h-full w-full" zoomControl={false}>
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
@@ -1272,17 +1301,45 @@ export default function App() {
             <MapEvents onLocationSelect={handleLocationSelect} />
             <MapController center={mapCenter} />
             
+            {/* Golden Hour Timer Overlay */}
+            {goldenHourTimer !== null && (
+              <div className="absolute top-20 right-6 z-[1000]">
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.8, x: 20 }}
+                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  className="bg-red-600/90 backdrop-blur-md border-2 border-red-400 text-white rounded-2xl p-4 shadow-[0_0_30px_rgba(220,38,38,0.4)] flex flex-col items-center gap-1 min-w-[140px]"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock className="h-4 w-4 animate-pulse" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-red-100">Golden Hour</span>
+                  </div>
+                  <div className="text-3xl font-black font-mono tracking-tighter tabular-nums drop-shadow-sm">
+                    {formatTime(goldenHourTimer)}
+                  </div>
+                  <div className="w-full bg-red-900/50 h-1 mt-2 rounded-full overflow-hidden">
+                    <motion.div 
+                      className="bg-white h-full"
+                      initial={{ width: '100%' }}
+                      animate={{ width: `${(goldenHourTimer / 3600) * 100}%` }}
+                      transition={{ duration: 1 }}
+                    />
+                  </div>
+                </motion.div>
+                <div className="absolute -inset-1 rounded-[1.2rem] bg-red-500 blur-lg opacity-20 animate-pulse -z-10"></div>
+              </div>
+            )}
+
             {/* New Incident Marker (Preview) */}
             <Marker position={[newPatient.lat, newPatient.lng]} icon={incidentIcon} opacity={0.7}>
-              <Popup>New Incident Location</Popup>
+              <Popup>Mission Target Origin</Popup>
             </Marker>
 
             {/* User GPS Location Marker */}
             {userLocation && (
               <Marker position={userLocation} icon={userLocationIcon} zIndexOffset={500}>
                 <Popup>
-                  <div className="font-bold text-sm text-emerald-700">📍 Your Location</div>
-                  <div className="text-xs text-gray-500">{userLocation[0].toFixed(5)}, {userLocation[1].toFixed(5)}</div>
+                  <div className="font-bold text-xs text-emerald-600 mb-1">📍 User Location (GPS)</div>
+                  <div className="text-[10px] text-slate-500 font-mono">{userLocation[0].toFixed(5)}, {userLocation[1].toFixed(5)}</div>
                 </Popup>
               </Marker>
             )}
@@ -1290,43 +1347,25 @@ export default function App() {
             {/* Hospital Markers */}
             {displayedHospitals.map(h => (
               <Marker key={h.id} position={[h.lat, h.lng]} icon={hospitalIcon}>
-                <Popup className="rounded-lg">
-                  <div className="font-bold text-sm mb-1">{h.name}</div>
-                  <div className="text-xs text-gray-600 mb-2">Level {h.level} Trauma Center</div>
-                  <div className="space-y-1 text-xs bg-slate-50 p-2 rounded border">
-                    <div className="flex justify-between">
-                      <span>ICU Beds:</span>
-                      <span className="font-semibold">{h.icuAvailable}/{h.icuTotal}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Ventilators:</span>
-                      <span className="font-semibold">{h.ventsAvailable}/{h.ventsTotal}</span>
-                    </div>
-                    <div className="flex justify-between pt-1 border-t mt-1">
-                      <span>Current Load:</span>
-                      <span className={`font-bold ${h.load > 90 ? 'text-red-600' : h.load > 70 ? 'text-amber-600' : 'text-green-600'}`}>{h.load}%</span>
-                    </div>
+                <Popup>
+                  <div className="text-xs font-semibold">{h.name}</div>
+                  <div className="text-[10px] text-slate-500 mt-1">
+                    ICU Beds: {h.icuAvailable}/{h.icuTotal}<br/>
+                    Load: {h.load}%
                   </div>
                 </Popup>
               </Marker>
             ))}
 
-            {/* Available Ambulances - Tiny green markers */}
-            {availableAmbulances.map(a => {
-              const dist = Math.sqrt(Math.pow(a.lat - newPatient.lat, 2) + Math.pow(a.lng - newPatient.lng, 2));
-              const eta = Math.max(1, Math.round(dist * 111 * 1.5));
-              return (
-                <Marker key={a.id} position={[a.lat, a.lng]} icon={idleAmbulanceIcon} zIndexOffset={600}>
-                  <Popup>
-                    <div style={{minWidth: 140}}>
-                      <div className="font-bold text-sm">🚑 {a.id}</div>
-                      <div className="text-xs text-gray-600 mt-1">Status: <span className="text-green-600 font-semibold">Available</span></div>
-                      <div className="text-xs mt-1">ETA to you: <strong className="text-blue-600">{eta} min</strong></div>
-                    </div>
-                  </Popup>
-                </Marker>
-              );
-            })}
+            {/* Available Ambulances */}
+            {availableAmbulances.map(a => (
+              <Marker key={a.id} position={[a.lat, a.lng]} icon={idleAmbulanceIcon} zIndexOffset={600}>
+                <Popup>
+                  <div className="text-xs font-bold">Ambulance {a.id}</div>
+                  <div className="text-[10px] text-emerald-600 font-semibold uppercase">Available</div>
+                </Popup>
+              </Marker>
+            ))}
 
             {/* Patient Markers & Routes */}
             {patients.map(p => {
@@ -1439,7 +1478,7 @@ export default function App() {
           )}
 
           {/* Map Legend */}
-          <div className="absolute bottom-6 right-6 z-[400] bg-white/95 backdrop-blur-md rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200 p-4 text-xs font-medium text-slate-700 pointer-events-none w-48">
+          <div className="absolute bottom-6 right-6 z-[400] bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-slate-200 p-4 text-xs font-medium text-slate-700 pointer-events-none w-48">
 
           {/* Floating SOS Button — on map */}
           <button
@@ -1458,7 +1497,7 @@ export default function App() {
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-blue-500 shadow-sm border-2 border-white flex items-center justify-center shrink-0"><div className="w-1.5 h-1.5 rounded-full bg-white"></div></div>
-                <span>Medical Facility{visionAnalysis?.override ? ' (L1 Only)' : ''}</span>
+                <span>Medical Facility</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-base shrink-0 leading-none">🚑</div>
@@ -1655,7 +1694,6 @@ export default function App() {
               ))}
             </div>
           </div>
-
         </div>
       </div>
 

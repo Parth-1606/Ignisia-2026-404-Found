@@ -10,7 +10,7 @@ import { Input } from './components/ui/input';
 import { Label } from './components/ui/label';
 import { motion, AnimatePresence } from 'motion/react';
 
-// Fix for default marker icons in react-leaflet
+
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -18,7 +18,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Custom Icons
+
 const hospitalIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/2.0.0/images/marker-shadow.png',
@@ -46,7 +46,7 @@ const incidentIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-// Types
+
 type Hospital = {
   id: string;
   name: string;
@@ -75,7 +75,7 @@ type Patient = {
   eta: number | null; // minutes
 };
 
-// Mock Data
+
 const INITIAL_HOSPITALS: Hospital[] = [
   { id: 'h1', name: 'General Hospital', lat: 40.7128, lng: -74.0060, level: 1, icuAvailable: 5, icuTotal: 20, ventsAvailable: 10, ventsTotal: 50, hasNeuro: true, hasCathLab: true, load: 75 },
   { id: 'h2', name: 'City Medical Center', lat: 40.7580, lng: -73.9855, level: 2, icuAvailable: 1, icuTotal: 20, ventsAvailable: 2, ventsTotal: 30, hasNeuro: false, hasCathLab: true, load: 95 },
@@ -98,7 +98,7 @@ const INITIAL_PATIENTS: Patient[] = [
   }
 ];
 
-// Map Helper Components
+
 function MapEvents({ onLocationSelect }: { onLocationSelect: (lat: number, lng: number) => void }) {
   useMapEvents({
     click(e) {
@@ -124,11 +124,100 @@ export default function App() {
   const [isMassCasualty, setIsMassCasualty] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>('p1');
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
-  
+
   // Form State
   const [newPatient, setNewPatient] = useState({
-    hr: 80, bp: '120/80', spo2: 98, gcs: 15, symptoms: '', lat: 40.7400, lng: -73.9900
+    hr: 80, bp: '120/80', spo2: 98, gcs: 15, symptoms: '', lat: 18.5204, lng: 73.8567
   });
+
+
+  const performDispatch = (patientData: typeof newPatient) => {
+    // 1. Severity Prediction
+    let severity: 'Critical' | 'Urgent' | 'Stable' = 'Stable';
+    let needs: string[] = [];
+
+    if (patientData.gcs <= 8 || patientData.spo2 < 90) {
+      severity = 'Critical';
+      needs.push('ICU', 'Ventilator');
+      if (patientData.symptoms.toLowerCase().includes('head') || patientData.symptoms.toLowerCase().includes('stroke') || patientData.symptoms.toLowerCase().includes('trauma')) {
+        needs.push('Neurosurgeon');
+      }
+    } else if (patientData.hr > 100 || patientData.symptoms.toLowerCase().includes('chest') || patientData.symptoms.toLowerCase().includes('cardiac')) {
+      severity = 'Urgent';
+      needs.push('Cath Lab');
+    }
+
+
+    let bestHospital = null;
+    let rationale = '';
+    let eta = 0;
+
+    if (needs.includes('Neurosurgeon')) {
+      bestHospital = hospitals.find(h => h.hasNeuro && h.icuAvailable > 0 && h.load < 90) || hospitals.find(h => h.hasNeuro);
+      rationale = `Patient requires Neurosurgeon. ${bestHospital?.name} selected due to specialist availability and acceptable ICU capacity.`;
+    } else if (needs.includes('Cath Lab')) {
+      bestHospital = hospitals.find(h => h.hasCathLab && h.load < 90) || hospitals[0];
+      rationale = `CRITICAL CARDIAC LOAD: Patient requires Cath Lab. ${bestHospital?.name} selected based on equipment availability and current load (${bestHospital?.load}%).`;
+    } else {
+      bestHospital = hospitals.sort((a, b) => a.load - b.load)[0];
+      rationale = `Routed to ${bestHospital?.name} due to lowest current regional load (${bestHospital?.load}%).`;
+    }
+    eta = Math.floor(Math.random() * 10) + 5;
+
+    const newPatientRecord: Patient = {
+      id: `p${Date.now().toString().slice(-4)}`,
+      lat: patientData.lat,
+      lng: patientData.lng,
+      vitals: { hr: patientData.hr, bp: patientData.bp, spo2: patientData.spo2, gcs: patientData.gcs },
+      symptoms: patientData.symptoms,
+      predictedNeeds: needs.length > 0 ? needs : ['Standard ED'],
+      severity,
+      assignedHospitalId: bestHospital?.id || null,
+      routingRationale: rationale,
+      eta,
+    };
+
+    setPatients(prev => [newPatientRecord, ...prev]);
+    setSelectedPatientId(newPatientRecord.id);
+    setMapCenter([newPatientRecord.lat, newPatientRecord.lng]);
+
+    if (bestHospital) {
+      setHospitals(prev => prev.map(h =>
+        h.id === bestHospital.id
+          ? { ...h, load: Math.min(100, h.load + 5), icuAvailable: Math.max(0, h.icuAvailable - (needs.includes('ICU') ? 1 : 0)) }
+          : h
+      ));
+    }
+    setNewPatient(prev => ({ ...prev, symptoms: '' }));
+  };
+
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const emergencyType = params.get('emergency');
+
+    if (emergencyType) {
+      let scenarioData = null;
+      if (emergencyType === 'cardiac') {
+        scenarioData = { hr: 145, bp: '90/60', spo2: 92, gcs: 14, symptoms: 'CRITICAL CARDIAC: Severe chest pain, diaphoresis, suspected STEMI' };
+      } else if (emergencyType === 'head') {
+        scenarioData = { hr: 130, bp: '80/50', spo2: 88, gcs: 7, symptoms: 'CRITICAL TRAUMA: Multi-system trauma, MVA, unresponsive' };
+      } else if (emergencyType === 'bleeding') {
+        scenarioData = { hr: 110, bp: '100/70', spo2: 94, gcs: 15, symptoms: 'URGENT BLEEDING: Heavy arterial bleeding, shock, deep laceration' };
+      } else if (emergencyType === 'unconscious') {
+        scenarioData = { hr: 50, bp: '80/40', spo2: 85, gcs: 5, symptoms: 'CRITICAL NEURO: Unconscious person, shallow breathing' };
+      } else if (emergencyType === 'burns') {
+        scenarioData = { hr: 120, bp: '130/90', spo2: 98, gcs: 15, symptoms: 'URGENT BURNS: Severe 3rd degree burns, chemical exposure' };
+      }
+
+      if (scenarioData) {
+        const fullPatientData = { ...newPatient, ...scenarioData };
+        setNewPatient(fullPatientData);
+
+        setTimeout(() => performDispatch(fullPatientData), 1000);
+      }
+    }
+  }, []);
 
   const selectedPatient = patients.find(p => p.id === selectedPatientId);
 
@@ -148,79 +237,9 @@ export default function App() {
     setMapCenter([patient.lat, patient.lng]);
   };
 
-  // Mock Prediction & Routing Engine
   const handleTriageSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // 1. Severity Prediction (Mock)
-    let severity: 'Critical' | 'Urgent' | 'Stable' = 'Stable';
-    let needs: string[] = [];
-    
-    if (newPatient.gcs <= 8 || newPatient.spo2 < 90) {
-      severity = 'Critical';
-      needs.push('ICU', 'Ventilator');
-      if (newPatient.symptoms.toLowerCase().includes('head') || newPatient.symptoms.toLowerCase().includes('stroke') || newPatient.symptoms.toLowerCase().includes('trauma')) {
-        needs.push('Neurosurgeon');
-      }
-    } else if (newPatient.hr > 100 || newPatient.symptoms.toLowerCase().includes('chest')) {
-      severity = 'Urgent';
-      needs.push('Cath Lab');
-    }
-
-    // 2. Constraint-Based Routing (Mock)
-    let bestHospital = null;
-    let rationale = '';
-    let eta = 0;
-
-    if (isMassCasualty) {
-      // Batch optimization logic: distribute load
-      const availableHospitals = hospitals.filter(h => h.load < 90);
-      bestHospital = availableHospitals.sort((a, b) => a.load - b.load)[0] || hospitals[0];
-      rationale = `Mass Casualty Protocol Active: Routed to ${bestHospital.name} to distribute regional load. Facility has ${bestHospital.icuAvailable} ICU beds available.`;
-      eta = Math.floor(Math.random() * 15) + 5;
-    } else {
-      // Single patient optimization
-      if (needs.includes('Neurosurgeon')) {
-        bestHospital = hospitals.find(h => h.hasNeuro && h.icuAvailable > 0 && h.load < 90) || hospitals.find(h => h.hasNeuro);
-        rationale = `Patient requires Neurosurgeon. ${bestHospital?.name} selected due to specialist availability and acceptable ICU capacity.`;
-      } else if (needs.includes('Cath Lab')) {
-        bestHospital = hospitals.find(h => h.hasCathLab && h.load < 90) || hospitals[0];
-        rationale = `Patient requires Cath Lab. ${bestHospital?.name} selected based on equipment availability and current load (${bestHospital?.load}%).`;
-      } else {
-        bestHospital = hospitals.sort((a, b) => a.load - b.load)[0];
-        rationale = `Routed to ${bestHospital?.name} due to lowest current regional load (${bestHospital?.load}%).`;
-      }
-      eta = Math.floor(Math.random() * 10) + 5;
-    }
-
-    const newPatientRecord: Patient = {
-      id: `p${Date.now().toString().slice(-4)}`,
-      lat: newPatient.lat,
-      lng: newPatient.lng,
-      vitals: { hr: newPatient.hr, bp: newPatient.bp, spo2: newPatient.spo2, gcs: newPatient.gcs },
-      symptoms: newPatient.symptoms,
-      predictedNeeds: needs.length > 0 ? needs : ['Standard ED'],
-      severity,
-      assignedHospitalId: bestHospital?.id || null,
-      routingRationale: rationale,
-      eta,
-    };
-
-    setPatients([newPatientRecord, ...patients]);
-    setSelectedPatientId(newPatientRecord.id);
-    setMapCenter([newPatientRecord.lat, newPatientRecord.lng]);
-    
-    // Update hospital load (mock)
-    if (bestHospital) {
-      setHospitals(hospitals.map(h => 
-        h.id === bestHospital.id 
-          ? { ...h, load: Math.min(100, h.load + 5), icuAvailable: Math.max(0, h.icuAvailable - (needs.includes('ICU') ? 1 : 0)) } 
-          : h
-      ));
-    }
-
-    // Reset form slightly for next entry
-    setNewPatient(prev => ({ ...prev, symptoms: '' }));
+    performDispatch(newPatient);
   };
 
   return (
@@ -240,7 +259,7 @@ export default function App() {
         <div className="flex items-center space-x-6">
           <div className="flex items-center space-x-3 bg-slate-800 px-4 py-2 rounded-lg border border-slate-700">
             <span className="text-sm font-medium text-slate-300">Mass Casualty Protocol</span>
-            <button 
+            <button
               onClick={() => setIsMassCasualty(!isMassCasualty)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-slate-900 ${isMassCasualty ? 'bg-red-500' : 'bg-slate-600'}`}
             >
@@ -257,7 +276,7 @@ export default function App() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar - Triage Input */}
         <div className="w-[380px] bg-white border-r border-gray-200 flex flex-col shadow-sm z-10 shrink-0">
-          
+
           <div className="p-4 border-b bg-slate-50">
             <h2 className="font-semibold text-lg flex items-center gap-2 mb-3">
               <Zap className="h-5 w-5 text-amber-500" />
@@ -283,42 +302,42 @@ export default function App() {
             <form onSubmit={handleTriageSubmit} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="symptoms" className="text-sm font-semibold">Reported Symptoms</Label>
-                <Input 
-                  id="symptoms" 
-                  placeholder="e.g., Severe chest pain, shortness of breath" 
+                <Input
+                  id="symptoms"
+                  placeholder="e.g., Severe chest pain, shortness of breath"
                   value={newPatient.symptoms}
-                  onChange={e => setNewPatient({...newPatient, symptoms: e.target.value})}
+                  onChange={e => setNewPatient({ ...newPatient, symptoms: e.target.value })}
                   required
                   className="bg-gray-50"
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border">
                 <div className="space-y-1">
                   <Label htmlFor="hr" className="text-xs font-semibold text-slate-600">Heart Rate</Label>
                   <div className="flex items-center gap-2">
-                    <Input id="hr" type="number" value={newPatient.hr} onChange={e => setNewPatient({...newPatient, hr: parseInt(e.target.value)})} className="h-8" />
+                    <Input id="hr" type="number" value={newPatient.hr} onChange={e => setNewPatient({ ...newPatient, hr: parseInt(e.target.value) })} className="h-8" />
                     <span className="text-xs text-slate-400 w-8">bpm</span>
                   </div>
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="bp" className="text-xs font-semibold text-slate-600">Blood Pressure</Label>
                   <div className="flex items-center gap-2">
-                    <Input id="bp" value={newPatient.bp} onChange={e => setNewPatient({...newPatient, bp: e.target.value})} className="h-8" />
+                    <Input id="bp" value={newPatient.bp} onChange={e => setNewPatient({ ...newPatient, bp: e.target.value })} className="h-8" />
                     <span className="text-xs text-slate-400 w-8">mmHg</span>
                   </div>
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="spo2" className="text-xs font-semibold text-slate-600">SpO2</Label>
                   <div className="flex items-center gap-2">
-                    <Input id="spo2" type="number" value={newPatient.spo2} onChange={e => setNewPatient({...newPatient, spo2: parseInt(e.target.value)})} className="h-8" />
+                    <Input id="spo2" type="number" value={newPatient.spo2} onChange={e => setNewPatient({ ...newPatient, spo2: parseInt(e.target.value) })} className="h-8" />
                     <span className="text-xs text-slate-400 w-8">%</span>
                   </div>
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="gcs" className="text-xs font-semibold text-slate-600">GCS Score</Label>
                   <div className="flex items-center gap-2">
-                    <Input id="gcs" type="number" min="3" max="15" value={newPatient.gcs} onChange={e => setNewPatient({...newPatient, gcs: parseInt(e.target.value)})} className="h-8" />
+                    <Input id="gcs" type="number" min="3" max="15" value={newPatient.gcs} onChange={e => setNewPatient({ ...newPatient, gcs: parseInt(e.target.value) })} className="h-8" />
                     <span className="text-xs text-slate-400 w-8">/15</span>
                   </div>
                 </div>
@@ -326,7 +345,7 @@ export default function App() {
 
               <div className="space-y-2">
                 <Label className="text-sm font-semibold flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-blue-500" /> 
+                  <MapPin className="h-4 w-4 text-blue-500" />
                   Incident Location
                 </Label>
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-3 text-sm text-blue-800">
@@ -353,7 +372,7 @@ export default function App() {
               <div className="space-y-3">
                 <AnimatePresence>
                   {patients.map(p => (
-                    <motion.div 
+                    <motion.div
                       key={p.id}
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -387,10 +406,10 @@ export default function App() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
             />
-            
+
             <MapEvents onLocationSelect={handleLocationSelect} />
             <MapController center={mapCenter} />
-            
+
             {/* New Incident Marker (Preview) */}
             <Marker position={[newPatient.lat, newPatient.lng]} icon={incidentIcon} opacity={0.7}>
               <Popup>New Incident Location</Popup>
@@ -433,8 +452,8 @@ export default function App() {
                     </Popup>
                   </Marker>
                   {targetHospital && (
-                    <Polyline 
-                      positions={[[p.lat, p.lng], [targetHospital.lat, targetHospital.lng]]} 
+                    <Polyline
+                      positions={[[p.lat, p.lng], [targetHospital.lat, targetHospital.lng]]}
                       color={isSelected ? "#2563eb" : "#94a3b8"}
                       weight={isSelected ? 5 : 3}
                       dashArray={isSelected ? "8, 12" : undefined}
@@ -445,7 +464,7 @@ export default function App() {
               );
             })}
           </MapContainer>
-          
+
           {/* Map Overlay Hint */}
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-lg border border-slate-200 text-sm font-medium text-slate-700 flex items-center gap-2 pointer-events-none">
             <MousePointerClick className="h-4 w-4 text-blue-500" />
@@ -455,17 +474,17 @@ export default function App() {
 
         {/* Right Sidebar - Routing Explainability & Hospital Status */}
         <div className="w-[400px] bg-white border-l border-gray-200 flex flex-col shadow-sm z-10 shrink-0">
-          
+
           {/* Explainability Panel */}
           <div className="p-5 border-b border-gray-200 bg-slate-50 flex-1 overflow-y-auto">
             <h2 className="font-semibold text-lg flex items-center gap-2 mb-5">
               <Navigation className="h-5 w-5 text-blue-600" />
               Routing Intelligence
             </h2>
-            
+
             <AnimatePresence mode="wait">
               {selectedPatient ? (
-                <motion.div 
+                <motion.div
                   key={selectedPatient.id}
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -508,7 +527,7 @@ export default function App() {
                           {selectedPatient.eta} min
                         </div>
                       </div>
-                      
+
                       <div className="bg-slate-800 p-4 rounded-lg text-sm text-slate-300 leading-relaxed shadow-inner relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
                         <span className="font-bold block mb-2 text-white flex items-center gap-2">
@@ -521,7 +540,7 @@ export default function App() {
                   </Card>
                 </motion.div>
               ) : (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="text-center text-gray-400 py-12 flex flex-col items-center bg-white rounded-xl border border-dashed border-gray-200"
@@ -539,7 +558,7 @@ export default function App() {
               <Activity className="h-5 w-5 text-red-500" />
               Live Regional Grid
             </h2>
-            
+
             <div className="space-y-3">
               {hospitals.map(h => (
                 <div key={h.id} className="border border-slate-200 rounded-xl p-4 text-sm shadow-sm hover:shadow-md transition-shadow bg-slate-50/50">
@@ -549,7 +568,7 @@ export default function App() {
                       {h.load}% Load
                     </Badge>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-3 text-xs text-slate-600 mb-3 bg-white p-2 rounded-lg border border-slate-100">
                     <div className="flex items-center gap-2">
                       <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${h.icuAvailable > 0 ? 'bg-green-500' : 'bg-red-500'}`} />
@@ -560,7 +579,7 @@ export default function App() {
                       <span className="font-medium">Vents: {h.ventsAvailable}/{h.ventsTotal}</span>
                     </div>
                   </div>
-                  
+
                   <div className="flex gap-2">
                     {h.hasNeuro && <Badge variant="outline" className="text-[10px] py-0 h-5 bg-white">Neuro</Badge>}
                     {h.hasCathLab && <Badge variant="outline" className="text-[10px] py-0 h-5 bg-white">Cath Lab</Badge>}

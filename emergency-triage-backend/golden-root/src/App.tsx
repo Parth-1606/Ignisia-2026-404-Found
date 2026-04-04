@@ -28,12 +28,14 @@ import {
   ExternalLink,
   CreditCard,
   Smartphone,
+  Zap,
+  ArrowLeft,
   HeartPulse,
   Brain,
   Droplets,
   UserX,
   Flame,
-  ArrowLeft
+  BookOpen
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -254,72 +256,72 @@ const RecommendedHospital = ({ emergency }: { emergency: Emergency | null }) => 
 };
 
 // --- Mini Map Preview ---
-const MiniMapPreview = ({ activeEmergency }: { activeEmergency: Emergency | null }) => {
-  // Mapping GPS to visual coordinates on our stylized grid
-  // Pune area roughly 18.4 to 18.6 Lat, 73.7 to 73.9 Lng
-  const mapCoords = (lat?: number, lng?: number) => {
-    if (!lat || !lng) return { x: 50, y: 50 };
-    const x = ((lng - 73.7) / 0.2) * 100;
-    const y = (1 - (lat - 18.4) / 0.2) * 100;
-    return { x: Math.max(10, Math.min(90, x)), y: Math.max(10, Math.min(90, y)) };
-  };
+const MiniMapPreview = ({ emergencies }: { emergencies: Emergency[] }) => {
+  const activeEmergency = emergencies[0] || null;
+  
+  // Simulated Pune cluster coordinates transformed to 0-100 grid for visualization
+  const pLoc = activeEmergency ? { 
+    x: 40 + (activeEmergency.patientLng % 0.1) * 200, 
+    y: 30 + (activeEmergency.patientLat % 0.1) * 200 
+  } : { x: 50, y: 50 };
 
-  const patientLoc = mapCoords(activeEmergency?.patientLat, activeEmergency?.patientLng);
-  const hospitalLoc = mapCoords(activeEmergency?.hospitalLat, activeEmergency?.hospitalLng);
+  const hLoc = activeEmergency ? { 
+    x: 40 + (activeEmergency.hospitalLng % 0.1) * 200, 
+    y: 30 + (activeEmergency.hospitalLat % 0.1) * 200 
+  } : { x: 70, y: 70 };
 
   return (
-    <div className="glass rounded-3xl p-6 h-full flex flex-col">
-      <h3 className="text-xl font-display font-bold mb-6">Live Tactical Network</h3>
-      
-      <div className="flex-1 rounded-2xl bg-[#080808] relative overflow-hidden border border-white/5">
-        {/* Animated Map visualization */}
-        <svg className="absolute inset-0 w-full h-full">
-          {activeEmergency && (
-            <motion.path
-              d={`M ${patientLoc.x} ${patientLoc.y} Q ${(patientLoc.x + hospitalLoc.x)/2} ${(patientLoc.y + hospitalLoc.y)/2 - 10} ${hospitalLoc.x} ${hospitalLoc.y}`}
-              fill="none"
-              stroke="url(#mapGradient)"
-              strokeWidth="2"
-              strokeDasharray="4 4"
-              initial={{ pathLength: 0 }}
-              animate={{ pathLength: 1 }}
+    <div className="w-full h-full relative cursor-pointer" onClick={() => window.location.href = 'http://localhost:5173'}>
+      {/* Background Map Grid */}
+      <div className="absolute inset-0 opacity-[0.03]">
+        <div className="h-full w-full" style={{ 
+          backgroundImage: 'radial-gradient(circle at 2px 2px, gold 1px, transparent 0)',
+          backgroundSize: '30px 30px'
+        }} />
+      </div>
+
+      <div className="relative h-full w-full bg-black/20 rounded-3xl border border-white/5 overflow-hidden">
+        {/* Radar Effect */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,215,0,0.05)_0%,transparent_70%)]" />
+        
+        {activeEmergency && (
+          <svg className="absolute inset-0 w-full h-full pointer-events-none">
+            <motion.line 
+              x1={`${pLoc.x}%`} y1={`${pLoc.y}%`} 
+              x2={`${hLoc.x}%`} y2={`${hLoc.y}%`}
+              stroke="gold" strokeWidth="1" strokeDasharray="4 4"
+              initial={{ pathLength: 0, opacity: 0 }}
+              animate={{ pathLength: 1, opacity: 0.3 }}
               transition={{ duration: 2, repeat: Infinity }}
             />
-          )}
-          <defs>
-            <linearGradient id="mapGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#FFD700" stopOpacity="0" />
-              <stop offset="50%" stopColor="#FFD700" stopOpacity="1" />
-              <stop offset="100%" stopColor="#FFD700" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-        </svg>
+          </svg>
+        )}
 
-        {/* Patient Dot */}
+        {/* Patient Pin */}
         {activeEmergency && (
           <motion.div 
             animate={{ scale: [1, 1.5, 1] }} 
             transition={{ repeat: Infinity, duration: 2 }}
-            className="absolute w-3 h-3 bg-red-500 rounded-full shadow-[0_0_15px_rgba(239,68,68,0.5)] z-10"
-            style={{ left: `${patientLoc.x}%`, top: `${patientLoc.y}%`, transform: 'translate(-50%, -50%)' }}
+            className="absolute w-3 h-3 bg-red-600 rounded-full shadow-[0_0_15px_rgba(239,68,68,0.5)] z-20"
+            style={{ left: `${pLoc.x}%`, top: `${pLoc.y}%`, transform: 'translate(-50%, -50%)' }}
           />
         )}
 
         {/* Hospital Marker */}
         {activeEmergency && (
-          <div 
-            className="absolute p-1.5 rounded-lg bg-gold text-black shadow-lg z-10"
-            style={{ left: `${hospitalLoc.x}%`, top: `${hospitalLoc.y}%`, transform: 'translate(-50%, -50%)' }}
+          <motion.div 
+            whileHover={{ scale: 1.1 }}
+            className="absolute p-1.5 rounded-lg bg-gold text-black shadow-lg z-20"
+            style={{ left: `${hLoc.x}%`, top: `${hLoc.y}%`, transform: 'translate(-50%, -50%)' }}
           >
             <Hospital className="w-3 h-3" />
-          </div>
+          </motion.div>
         )}
 
-        {/* Scanning Grid Overlay */}
-        <div className="absolute inset-0 opacity-20 pointer-events-none">
-          <div className="absolute inset-0 grid grid-cols-10 grid-rows-10">
-            {Array.from({ length: 100 }).map((_, i) => (
-              <div key={i} className="border-[0.5px] border-gold/20" />
+        <div className="absolute inset-0 opacity-10 pointer-events-none">
+          <div className="absolute inset-0 grid grid-cols-12 grid-rows-12">
+            {Array.from({ length: 144 }).map((_, i) => (
+              <div key={i} className="border-[0.5px] border-gold/10" />
             ))}
           </div>
           <motion.div 
@@ -707,13 +709,138 @@ const AboutView = () => (
 
 // --- Landing Page Components ---
 const Hero = ({ setView }: { setView: (v: View) => void }) => {
+  const [showTriageForm, setShowTriageForm] = useState(false);
+  const [vitals, setVitals] = useState({ hr: 80, bp: '120/80', spo2: 98 });
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [traumaDetected, setTraumaDetected] = useState<boolean | null>(null);
+
   const handleTriggerAlert = () => {
-    // Redirect to the dispatcher dashboard on port 5173
-    window.location.href = 'http://localhost:5173';
+    setShowTriageForm(true);
+  };
+
+  const handlePhotoUpload = (e: any) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setPhoto(ev.target?.result as string);
+      setIsAnalyzing(true);
+      setTimeout(() => {
+        setIsAnalyzing(false);
+        setTraumaDetected(true);
+      }, 2000);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFinalDispatch = () => {
+    const params = new URLSearchParams({
+      emergency: traumaDetected ? 'head' : 'manual_alert',
+      hr: vitals.hr.toString(),
+      bp: vitals.bp,
+      spo2: vitals.spo2.toString()
+    });
+    window.location.href = `http://localhost:5173?${params.toString()}`;
   };
 
   return (
     <div className="py-20 flex flex-col items-center text-center">
+      <AnimatePresence>
+        {showTriageForm && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl"
+          >
+            <div className="max-w-2xl w-full glass rounded-[40px] p-12 border-gold/20 text-left gold-glow overflow-y-auto max-h-[90vh]">
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-3xl font-display font-bold">Quick Triage Check</h2>
+                <button onClick={() => setShowTriageForm(false)} className="text-white/40 hover:text-white transition-colors">
+                  <ArrowLeft className="w-6 h-6 rotate-90" />
+                </button>
+              </div>
+              
+              <div className="space-y-6 mb-10">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Heart Rate (BPM)</label>
+                    <input 
+                      type="number" 
+                      value={vitals.hr} 
+                      onChange={(e) => setVitals(prev => ({ ...prev, hr: parseInt(e.target.value) }))}
+                      className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-xl font-bold focus:outline-none focus:border-gold/30 transition-all text-gold"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Blood Pressure</label>
+                    <input 
+                      type="text" 
+                      value={vitals.bp} 
+                      onChange={(e) => setVitals(prev => ({ ...prev, bp: e.target.value }))}
+                      className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-xl font-bold focus:outline-none focus:border-gold/30 transition-all text-gold"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest">SpO2 Level (%)</label>
+                  <input 
+                    type="number" 
+                    value={vitals.spo2} 
+                    onChange={(e) => setVitals(prev => ({ ...prev, spo2: parseInt(e.target.value) }))}
+                    className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-xl font-bold focus:outline-none focus:border-gold/30 transition-all text-gold"
+                  />
+                </div>
+
+                {/* Scene Photo Section */}
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest block">Scene Photo Analysis</label>
+                  {!photo ? (
+                    <label className="flex flex-col items-center justify-center gap-3 w-full h-32 bg-white/5 border-2 border-dashed border-white/10 rounded-2xl cursor-pointer hover:bg-white/10 transition-all group">
+                      <Smartphone className="w-8 h-8 text-white/20 group-hover:text-gold transition-colors" />
+                      <span className="text-xs font-bold text-white/40 tracking-wide">Upload Accident Photo for AI Scan</span>
+                      <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} />
+                    </label>
+                  ) : (
+                    <div className="relative rounded-2xl overflow-hidden bg-white/5 border border-gold/20 p-2">
+                      <img src={photo} className="w-full h-40 object-cover rounded-xl opacity-60" />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        {isAnalyzing ? (
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="w-10 h-10 border-4 border-gold/20 border-t-gold rounded-full animate-spin" />
+                            <span className="text-sm font-bold text-gold animate-pulse tracking-widest">SCANNING...</span>
+                          </div>
+                        ) : traumaDetected && (
+                          <motion.div 
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="bg-red-500 text-white px-6 py-3 rounded-full font-black text-xs tracking-widest flex items-center gap-2 shadow-[0_0_30px_rgba(239,68,68,0.5)]"
+                          >
+                             <AlertTriangle className="w-4 h-4" />
+                             LEVEL 1 TRAUMA DETECTED
+                          </motion.div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <button 
+                onClick={handleFinalDispatch}
+                disabled={isAnalyzing}
+                className={`w-full py-5 bg-gold text-black font-black rounded-[24px] transition-all flex items-center justify-center gap-3 text-lg shadow-[0_0_40px_rgba(255,215,0,0.2)] ${isAnalyzing ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'}`}
+              >
+                <Zap className="w-6 h-6 fill-black" />
+                Initialize Tactical Dispatch
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -722,6 +849,7 @@ const Hero = ({ setView }: { setView: (v: View) => void }) => {
         <AlertTriangle className="w-4 h-4" />
         Emergency Response in Seconds
       </motion.div>
+
       <motion.h1 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -730,6 +858,7 @@ const Hero = ({ setView }: { setView: (v: View) => void }) => {
       >
         The Future of <span className="text-gold">Emergency Dispatch</span> is Here.
       </motion.h1>
+
       <motion.p 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -739,6 +868,7 @@ const Hero = ({ setView }: { setView: (v: View) => void }) => {
         GoldenHour Dispatch uses advanced AI to detect accidents and route ambulances in real-time. 
         Saving lives through precision and speed.
       </motion.p>
+
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -1245,10 +1375,70 @@ const ManualView = () => {
     }
   ];
 
+  const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
+
+  const handleServicesClick = (id: string) => {
+    setPendingRedirect(id);
+    
+    // Explicitly trigger browser's native location prompt
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          console.log("GPS Signal Lock Acquired:", position.coords);
+          // Redirect with the acquired context
+          setTimeout(() => {
+            window.location.href = `http://localhost:5173/?emergency=${id}&lat=${position.coords.latitude}&lng=${position.coords.longitude}`;
+          }, 1500); // 1.5s visual confirmation
+        },
+        (error) => {
+          console.warn("GPS Signal Denied, proceeding with default Pune location data:", error);
+          setTimeout(() => {
+            window.location.href = `http://localhost:5173/?emergency=${id}`;
+          }, 1500);
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    } else {
+      setTimeout(() => {
+        window.location.href = `http://localhost:5173/?emergency=${id}`;
+      }, 1500);
+    }
+  };
+
   const selectedGuide = guides.find(g => g.id === selectedId);
 
   return (
     <div className="max-w-4xl mx-auto pb-20">
+      <AnimatePresence>
+        {pendingRedirect && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl"
+          >
+            <div className="max-w-xl w-full glass rounded-[40px] p-12 border-gold/20 text-center gold-glow">
+              <motion.div 
+                animate={{ scale: [1, 1.1, 1] }} 
+                transition={{ repeat: Infinity, duration: 2 }}
+                className="w-24 h-24 rounded-full bg-gold/10 flex items-center justify-center text-gold mx-auto mb-8 border border-gold/20"
+              >
+                <MapPin className="w-12 h-12" />
+              </motion.div>
+              <h2 className="text-4xl font-display font-bold mb-4">Enable Location</h2>
+              <p className="text-xl text-white/60 mb-8 leading-relaxed">
+                We need your GPS coordinates to dispatch the nearest ambulance immediately. 
+                Please ensure location services are enabled on your device.
+              </p>
+              <div className="flex items-center justify-center gap-3 text-gold font-bold">
+                <div className="w-6 h-6 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+                <span className="uppercase tracking-[0.2em] text-sm">Authorizing Signal...</span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="mb-12">
         <h2 className="text-4xl font-display font-bold mb-2">Emergency Help Guide</h2>
         <p className="text-gold font-medium">“Golden Minutes Care” — Every second counts.</p>
@@ -1267,19 +1457,39 @@ const ManualView = () => {
               <h3 className="text-xl font-bold text-white/60">What happened? Select a situation:</h3>
             </div>
             {guides.map((guide) => (
-              <button
+              <div
                 key={guide.id}
-                onClick={() => setSelectedId(guide.id)}
-                className="glass rounded-[32px] p-8 border-white/5 hover:border-gold/20 transition-all group text-left flex items-center gap-6"
+                className="glass rounded-[32px] p-8 border-white/5 hover:border-gold/20 transition-all group relative overflow-hidden flex items-center gap-6"
               >
-                <div className={`w-16 h-16 rounded-2xl ${guide.bg} flex items-center justify-center ${guide.color} group-hover:scale-110 transition-transform shrink-0`}>
-                  {guide.icon}
+                {/* Information Layer */}
+                <div className="flex items-center gap-6 w-full group-hover:opacity-10 transition-opacity duration-300">
+                  <div className={`w-16 h-16 rounded-2xl ${guide.bg} flex items-center justify-center ${guide.color} group-hover:scale-110 transition-transform shrink-0`}>
+                    {guide.icon}
+                  </div>
+                  <div>
+                    <h4 className="text-xl font-bold mb-1">{guide.title.en}</h4>
+                    <p className="text-sm text-white/40">Hover for options</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-xl font-bold mb-1">{guide.title.en}</h4>
-                  <p className="text-sm text-white/40">Click to view precautions</p>
+
+                {/* Hover Action Layer */}
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center justify-center gap-4 p-6 translate-y-4 group-hover:translate-y-0">
+                  <button 
+                    onClick={() => setSelectedId(guide.id)}
+                    className="w-full py-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-sm font-bold transition-all flex items-center justify-center gap-2"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Read Manual
+                  </button>
+                  <button 
+                    onClick={() => handleServicesClick(guide.id)}
+                    className="w-full py-3 bg-gold text-black rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2 hover:scale-[1.02]"
+                  >
+                    <Phone className="w-4 h-4" />
+                    Emergency Services
+                  </button>
                 </div>
-              </button>
+              </div>
             ))}
           </motion.div>
         ) : (
@@ -1584,21 +1794,34 @@ export default function App() {
               <div className="py-20">
                 <div className="glass rounded-[40px] p-12 border-gold/10 gold-glow overflow-hidden relative">
                   <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                    <div>
-                      <h2 className="text-5xl font-display font-bold mb-6">Live Response Network</h2>
-                      <p className="text-lg text-white/40 mb-8 leading-relaxed">
+                    <div className="lg:w-1/2">
+                      <h2 className="text-6xl font-display font-bold mb-6 leading-tight">Live Response <br /><span className="text-gold">Network</span></h2>
+                      <p className="text-xl text-white/40 mb-10 leading-relaxed max-w-lg">
                         Our proprietary network connects every emergency asset in the city. 
-                        Real-time data visualization allows for split-second decision making.
+                        Real-time data visualization allows for split-second decision making and instant hospital orchestration.
                       </p>
-                      <button 
-                        onClick={() => setView('manual')}
-                        className="px-8 py-4 bg-gold text-black font-bold rounded-2xl hover:scale-105 transition-transform"
-                      >
-                        Manual
-                      </button>
+                      <div className="flex gap-4">
+                        <button 
+                          onClick={() => window.location.href = 'http://localhost:5173'}
+                          className="px-10 py-5 bg-gold text-black font-black rounded-2xl hover:scale-105 transition-all shadow-[0_0_40px_rgba(255,215,0,0.3)] flex items-center gap-3 group"
+                        >
+                          <Ambulance className="w-5 h-5 group-hover:animate-bounce" />
+                          Call Ambulance
+                        </button>
+                        <button 
+                          onClick={() => setView('manual')}
+                          className="px-8 py-5 glass rounded-2xl font-bold hover:bg-white/5 transition-all text-sm uppercase tracking-widest text-white/60"
+                        >
+                          Guide
+                        </button>
+                      </div>
                     </div>
-                    <div className="h-[400px] rounded-3xl bg-black/40 border border-white/5 overflow-hidden relative">
-                       <MiniMapPreview activeEmergency={emergencies[0] || null} />
+                    <div 
+                      className="lg:w-1/2 h-[450px] rounded-[40px] bg-black/40 border border-white/5 overflow-hidden relative cursor-pointer group/map"
+                      onClick={() => window.location.href = 'http://localhost:5173'}
+                    >
+                      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1526628953301-3e589a6a8b74?q=80&w=2006&auto=format&fit=crop')] bg-cover opacity-10 grayscale group-hover:opacity-20 transition-opacity" />
+                       <MiniMapPreview emergencies={emergencies} />
                     </div>
                   </div>
                 </div>
