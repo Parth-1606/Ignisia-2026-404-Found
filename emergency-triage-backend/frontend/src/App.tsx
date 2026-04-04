@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { Activity, Clock, MapPin, Navigation, ShieldAlert, CheckCircle2, Zap, MousePointerClick, HeartPulse, Car, UserCheck, Crosshair, Loader2, ExternalLink, Bot, Mic, Send, X, AlertTriangle, Camera, Scan } from 'lucide-react';
+import { Activity, Clock, MapPin, Navigation, ShieldAlert, CheckCircle2, Zap, MousePointerClick, HeartPulse, Car, UserCheck, Crosshair, Loader2, ExternalLink, Bot, Mic, MicOff, Send, X, AlertTriangle, Camera, Scan, Maximize2, Minimize2, Square } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Button } from './components/ui/button';
 import { Badge } from './components/ui/badge';
@@ -24,7 +24,7 @@ L.Icon.Default.mergeOptions({
 // Custom Icons
 const hospitalIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/2.0.0/images/marker-shadow.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
@@ -59,7 +59,7 @@ const activeAmbulanceIcon = new L.DivIcon({
 
 const incidentIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/2.0.0/images/marker-shadow.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
@@ -68,7 +68,7 @@ const incidentIcon = new L.Icon({
 
 const userLocationIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/2.0.0/images/marker-shadow.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
@@ -555,7 +555,7 @@ export default function App() {
         // Fetch Google Maps style route coords
         const routeToPatient = await fetchRoute([ambLat, ambLng], [newPatient.lat, newPatient.lng]);
         const routeToHospital = bestHospital 
-          ? await fetchRoute([newPatient.lat, newPatient.lng], [bestHospital.lat, bestHospital.lng]) 
+          ? await fetchRoute([newPatient.lat, newPatient.lng], [bestHospital.lat || parseFloat(bestHospital.latitude), bestHospital.lng || parseFloat(bestHospital.longitude)]) 
           : [];
 
         // Remove the dispatched ambulance from available pool
@@ -603,6 +603,174 @@ export default function App() {
     } catch (err) {
       console.error('API Error:', err);
       alert('Failed to connect to backend routing engine.');
+    }
+  };
+
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{sender: 'user'|'ai', text: string}[]>([{sender: 'ai', text: 'How may I help you?'}]);
+  const [chatInput, setChatInput] = useState('');
+
+  const [sosActive, setSosActive] = useState(false);
+
+  const triggerSOS = async () => {
+    setSosActive(true);
+    // Get location
+    const lat = userLocation ? userLocation[0] : newPatient.lat;
+    const lng = userLocation ? userLocation[1] : newPatient.lng;
+
+    // Build critical payload
+    const payload = {
+      incident_id: `SOS-${Date.now().toString().slice(-6)}`,
+      age: 30,
+      gender: 'unknown',
+      heart_rate: 140,
+      systolic_bp: 80,
+      diastolic_bp: 50,
+      respiratory_rate: 28,
+      temperature: 37.5,
+      spo2: 85,
+      gcs_score: 6,
+      symptoms: ['SOS Emergency', 'Critical Distress', 'Automated Dispatch'],
+      incident_latitude: lat,
+      incident_longitude: lng,
+    };
+
+    try {
+      const res = await fetch('http://localhost:3000/api/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        const { prediction, routing } = data.data;
+        const bestHospital = routing?.optimal?.hospital;
+
+        // Find nearest ambulance
+        let nearestAmb = availableAmbulances.length > 0 ? availableAmbulances[0] : null;
+        let minDist = Infinity;
+        availableAmbulances.forEach(a => {
+          const d = Math.sqrt(Math.pow(a.lat - lat, 2) + Math.pow(a.lng - lng, 2));
+          if (d < minDist) { minDist = d; nearestAmb = a; }
+        });
+
+        const ambLat = nearestAmb ? nearestAmb.lat : lat + (Math.random() - 0.5) * 0.05;
+        const ambLng = nearestAmb ? nearestAmb.lng : lng + (Math.random() - 0.5) * 0.05;
+
+        const routeToPatient = await fetchRoute([ambLat, ambLng], [lat, lng]);
+        const routeToHospital = bestHospital
+          ? await fetchRoute([lat, lng], [bestHospital.lat || parseFloat(bestHospital.latitude), bestHospital.lng || parseFloat(bestHospital.longitude)])
+          : [];
+
+        if (nearestAmb) {
+          setAvailableAmbulances(prev => prev.filter(a => a.id !== nearestAmb!.id));
+        }
+
+        const newPatientRecord: Patient = {
+          id: data.data.incidentId || payload.incident_id,
+          lat, lng,
+          ambulanceLat: ambLat,
+          ambulanceLng: ambLng,
+          dispatchedUnit: nearestAmb ? nearestAmb.id : 'AMB-SOS',
+          routeToPatient,
+          routeToHospital,
+          currentRoutePhase: 'TO_PATIENT',
+          currentRouteIndex: 0,
+          vitals: { hr: 140, bp: '80/50', spo2: 85, gcs: 6 },
+          symptoms: 'SOS EMERGENCY — Automated Critical Dispatch',
+          predictedNeeds: [
+            ...(prediction.predictedCareNeeds?.equipment || []),
+            prediction.predictedCareNeeds?.specialist
+          ].filter(Boolean) as string[],
+          severity: 'Critical',
+          assignedHospitalId: bestHospital?.id || null,
+          routingRationale: '🚨 SOS AUTOMATED DISPATCH: Critical distress signal received. Nearest unit dispatched immediately to GPS location. No manual triage required.',
+          eta: routing?.optimal?.transitMinutes || 0,
+        };
+
+        setPatients(prev => [newPatientRecord, ...prev]);
+        setSelectedPatientId(newPatientRecord.id);
+        setMapCenter([lat, lng]);
+
+        // Refresh hospitals
+        const hRes = await fetch('http://localhost:3000/api/hospitals');
+        const hData = await hRes.json();
+        if (hData.success) setHospitals(hData.data.map(mapHospital));
+      }
+    } catch (err) {
+      console.error('SOS Dispatch Error:', err);
+    } finally {
+      setTimeout(() => setSosActive(false), 3000);
+    }
+  };
+
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isAiThinking, setIsAiThinking] = useState(false);
+  const chatEndRef = React.useRef<HTMLDivElement>(null);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  // Voice-to-Text using Web Speech API
+  const toggleVoice = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) { alert('Speech recognition is not supported in this browser. Use Chrome.'); return; }
+    if (isListening) { setIsListening(false); return; }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    setIsListening(true);
+    recognition.start();
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setChatInput(prev => prev ? prev + ' ' + transcript : transcript);
+      setIsListening(false);
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+  };
+
+  const handleChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    const userMsg = chatInput.trim();
+    setChatMessages(prev => [...prev, { sender: 'user', text: userMsg }]);
+    setChatInput('');
+    setIsAiThinking(true);
+
+    try {
+      const res = await fetch('http://localhost:3000/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [...chatMessages, { sender: 'user', text: userMsg }],
+          context: {
+            hospitalCount: hospitals.length,
+            activeDispatches: patients.length,
+            availableAmbulances: availableAmbulances.length,
+            selectedPatient: selectedPatient ? {
+              id: selectedPatient.id,
+              severity: selectedPatient.severity,
+              symptoms: selectedPatient.symptoms,
+            } : null,
+          }
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setChatMessages(prev => [...prev, { sender: 'ai', text: data.response }]);
+      } else {
+        setChatMessages(prev => [...prev, { sender: 'ai', text: 'Request failed. Please try again.' }]);
+      }
+    } catch {
+      setChatMessages(prev => [...prev, { sender: 'ai', text: 'Cannot reach dispatch server. Check that the backend is running on port 3000.' }]);
+    } finally {
+      setIsAiThinking(false);
     }
   };
 
@@ -966,26 +1134,50 @@ export default function App() {
                   
                   {/* Route from Ambulance to Patient */}
                   {p.currentRoutePhase === 'TO_PATIENT' && p.routeToPatient.length > 0 && (
-                    <Polyline 
-                      positions={p.routeToPatient} 
-                      color="#3b82f6" // Bright Blue like Google Maps
-                      weight={5}
-                      opacity={0.8}
-                      dashArray="10 15"
-                      className="animate-flow drop-shadow-md"
-                    />
+                    <>
+                      {/* Outer Border */}
+                      <Polyline 
+                        positions={p.routeToPatient} 
+                        color="#1e40af" // Dark blue border
+                        weight={8}
+                        opacity={0.8}
+                        lineCap="round"
+                        lineJoin="round"
+                      />
+                      {/* Inner Path */}
+                      <Polyline 
+                        positions={p.routeToPatient} 
+                        color="#3b82f6" // Google Maps bright blue
+                        weight={5}
+                        opacity={1}
+                        lineCap="round"
+                        lineJoin="round"
+                      />
+                    </>
                   )}
 
                   {/* Route from Patient to Hospital */}
                   {(p.currentRoutePhase === 'TO_PATIENT' || p.currentRoutePhase === 'TO_HOSPITAL') && targetHospital && p.routeToHospital.length > 0 && (
-                    <Polyline 
-                      positions={p.routeToHospital} 
-                      color="#8b5cf6" 
-                      weight={5}
-                      opacity={0.6}
-                      dashArray="10 15"
-                      className="animate-flow drop-shadow-md"
-                    />
+                    <>
+                      {/* Outer Border */}
+                      <Polyline 
+                        positions={p.routeToHospital} 
+                        color="#4c1d95" // Dark purple border
+                        weight={8}
+                        opacity={0.8}
+                        lineCap="round"
+                        lineJoin="round"
+                      />
+                      {/* Inner Path */}
+                      <Polyline 
+                        positions={p.routeToHospital} 
+                        color="#8b5cf6" // Bright purple
+                        weight={5}
+                        opacity={1}
+                        lineCap="round"
+                        lineJoin="round"
+                      />
+                    </>
                   )}
                 </React.Fragment>
               );
@@ -1000,6 +1192,16 @@ export default function App() {
 
           {/* Map Legend */}
           <div className="absolute bottom-6 right-6 z-[400] bg-white/95 backdrop-blur-md rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200 p-4 text-xs font-medium text-slate-700 pointer-events-none w-48">
+
+          {/* Floating SOS Button — on map */}
+          <button
+            onClick={triggerSOS}
+            disabled={sosActive}
+            className={`pointer-events-auto absolute -top-20 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full flex items-center justify-center text-white font-black text-lg shadow-[0_4px_25px_rgba(220,38,38,0.6)] transition-all duration-300 active:scale-90 z-50 ${sosActive ? 'bg-green-500 scale-110' : 'bg-red-600 hover:bg-red-700 hover:scale-110 hover:shadow-[0_0_35px_rgba(220,38,38,0.8)]'}`}
+            style={{ animation: sosActive ? 'none' : 'sos-pulse 2s ease-in-out infinite' }}
+          >
+            {sosActive ? '✓' : 'SOS'}
+          </button>
             <h4 className="text-slate-900 font-bold mb-3 border-b border-slate-100 pb-2 uppercase tracking-wide text-[10px]">Live Map Legend</h4>
             <div className="space-y-3">
               <div className="flex items-center gap-3">
@@ -1160,39 +1362,6 @@ export default function App() {
             </AnimatePresence>
           </div>
 
-          {/* Live Activity Feed */}
-          {liveUpdates.length > 0 && (
-            <div className="px-5 py-3 border-b border-gray-200 bg-gradient-to-r from-slate-900 to-slate-800">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
-                </span>
-                Live Updates
-              </h3>
-              <div className="space-y-1 max-h-[120px] overflow-y-auto">
-                <AnimatePresence>
-                  {liveUpdates.map((u) => (
-                    <motion.div
-                      key={u.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0 }}
-                      className="flex items-center gap-2 text-[11px]"
-                    >
-                      <span className="text-slate-500 font-mono shrink-0">{u.time}</span>
-                      <span className={`shrink-0 text-base ${u.type === 'up' ? '🔺' : '🔻'}`}>
-                        {u.type === 'up' ? '▲' : '▼'}
-                      </span>
-                      <span className={`truncate ${u.type === 'up' ? 'text-red-400' : 'text-green-400'}`}>
-                        {u.text}
-                      </span>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-            </div>
-          )}
 
           {/* Live Hospital Grid */}
           <div className="p-5 flex-1 overflow-y-auto bg-white">
@@ -1235,6 +1404,150 @@ export default function App() {
 
         </div>
       </div>
+
+      {/* FOOTER - Live Updates & Quick Actions */}
+      <footer className="h-14 bg-slate-900 border-t border-slate-800 text-white flex items-center shrink-0 w-full z-50 overflow-hidden relative">
+        {/* Ticker Section */}
+        <div className="flex-1 overflow-hidden h-full flex items-center bg-slate-900">
+          <div className="px-4 h-full flex items-center bg-slate-900 border-r border-slate-800 z-20 shrink-0 shadow-lg">
+            <span className="relative flex h-2.5 w-2.5 mr-3">
+               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+            </span>
+            <span className="text-xs font-bold tracking-wider text-slate-300 uppercase">Live Network</span>
+          </div>
+          
+          <div className="flex-1 overflow-hidden whitespace-nowrap relative h-full flex items-center">
+            {liveUpdates.length > 0 ? (
+              <div className="animate-ticker inline-flex items-center space-x-12 px-8">
+                {liveUpdates.map(u => (
+                  <span key={u.id} className="text-sm flex items-center gap-2">
+                    <span className="text-slate-500 font-mono text-xs">{u.time}</span>
+                    <span className={u.type === 'up' ? 'text-red-400' : 'text-green-400'}>
+                      {u.type === 'up' ? '▲' : '▼'} {u.text}
+                    </span>
+                  </span>
+                ))}
+                {liveUpdates.map(u => (
+                  <span key={u.id + '-clone'} className="text-sm flex items-center gap-2">
+                    <span className="text-slate-500 font-mono text-xs">{u.time}</span>
+                    <span className={u.type === 'up' ? 'text-red-400' : 'text-green-400'}>
+                      {u.type === 'up' ? '▲' : '▼'} {u.text}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span className="text-slate-500 text-sm italic px-6">Connecting to dispatch network...</span>
+            )}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center space-x-3 px-5 h-full border-l border-slate-800 bg-slate-900 shrink-0 z-20 shadow-[-10px_0_20px_rgba(15,23,42,1)]">
+          <Button 
+            className={`h-9 px-4 text-xs font-bold transition-all shadow-md active:scale-95 ${isChatOpen ? 'bg-indigo-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-indigo-400 border border-slate-700'}`}
+            onClick={() => setIsChatOpen(!isChatOpen)}
+          >
+            <Bot className="w-4 h-4 mr-1.5" /> 
+            AI ASSISTANT
+          </Button>
+        </div>
+      </footer>
+
+      {/* Floating AI Chat Assistant */}
+      <AnimatePresence>
+        {isChatOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className={`fixed flex flex-col bg-white shadow-[0_10px_40px_rgba(0,0,0,0.25)] border border-slate-200 z-[1000] overflow-hidden transition-all duration-300 ${
+              isExpanded 
+                ? 'inset-4 rounded-3xl' 
+                : 'bottom-20 right-6 w-96 max-h-[500px] rounded-2xl'
+            }`}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white p-4 flex justify-between items-center shadow-md shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                  <Bot className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm tracking-wide">Ignisia AI Dispatcher</h3>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setIsExpanded(!isExpanded)} className="text-indigo-200 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10">
+                  {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </button>
+                <button onClick={() => { setIsChatOpen(false); setIsExpanded(false); }} className="text-indigo-200 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            
+            {/* Messages */}
+            <div className={`flex-1 p-4 overflow-y-auto space-y-4 bg-gradient-to-b from-slate-50 to-white ${isExpanded ? 'p-6' : ''}`}>
+              {chatMessages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  {msg.sender === 'ai' && (
+                    <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-1 shrink-0">
+                      <Bot className="h-3.5 w-3.5 text-indigo-600" />
+                    </div>
+                  )}
+                  <div className={`${isExpanded ? 'max-w-[60%]' : 'max-w-[80%]'} rounded-2xl px-4 py-2.5 text-sm shadow-sm ${msg.sender === 'user' ? 'bg-indigo-600 text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'}`}>
+                    <span className="whitespace-pre-wrap">{msg.text}</span>
+                  </div>
+                </div>
+              ))}
+              {isAiThinking && (
+                <div className="flex justify-start">
+                  <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center mr-2 mt-1 shrink-0">
+                    <Bot className="h-3.5 w-3.5 text-indigo-600" />
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Input Bar */}
+            <div className={`p-3 bg-white border-t border-slate-100 shrink-0 ${isExpanded ? 'p-4' : ''}`}>
+              <form onSubmit={handleChatSubmit} className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Input 
+                    placeholder={isListening ? '🎙️ Listening... speak now' : 'Ask about dispatches, hospitals, protocols...'}
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    disabled={isAiThinking}
+                    className={`w-full pl-4 pr-12 bg-slate-50 border-slate-200 focus-visible:ring-indigo-500 rounded-xl ${isExpanded ? 'h-12 text-base' : ''} ${isListening ? 'border-red-400 bg-red-50' : ''}`}
+                  />
+                  <button 
+                    type="button" 
+                    onClick={toggleVoice}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-slate-400 hover:text-indigo-500'}`}
+                  >
+                    {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  </button>
+                </div>
+                <Button type="submit" size="icon" disabled={isAiThinking || !chatInput.trim()} className={`bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm shrink-0 disabled:opacity-50 ${isExpanded ? 'w-12 h-12' : ''}`}>
+                  <Send className="h-4 w-4" />
+                </Button>
+              </form>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

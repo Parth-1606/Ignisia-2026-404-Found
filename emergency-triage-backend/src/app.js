@@ -9,6 +9,7 @@ const path = require('path');
 const dispatchRoutes  = require('./routes/dispatch');
 const hospitalRoutes  = require('./routes/hospitals');
 const patientRoutes   = require('./routes/patients');
+const chatRoutes      = require('./routes/chat');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -53,6 +54,7 @@ app.get('/health', (req, res) => {
 app.use('/api/dispatch',  dispatchLimiter, dispatchRoutes);
 app.use('/api/hospitals', hospitalRoutes);
 app.use('/api/patients',  patientRoutes);
+app.use('/api/chat',      chatRoutes);
 
 // ============================================================
 // FRONTEND INTEGRATION
