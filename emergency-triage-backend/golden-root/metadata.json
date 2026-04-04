@@ -1,0 +1,5 @@
+{
+  "name": "Golden Root",
+  "description": "An advanced emergency dispatch and hospital recommendation system with real-time tracking.",
+  "requestFramePermissions": ["geolocation"]
+}
