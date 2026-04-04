@@ -40,6 +40,13 @@ import { useState, useEffect } from 'react';
 // --- Types ---
 type View = 'landing' | 'dashboard' | 'hospitals' | 'settings' | 'userRoles' | 'manual';
 
+interface User {
+  name: string;
+  email: string;
+  avatar?: string;
+  initials?: string;
+}
+
 interface HospitalData {
   id: string | number;
   name: string;
@@ -71,7 +78,6 @@ const Sidebar = ({ currentView, setView }: { currentView: View, setView: (v: Vie
     { icon: <Activity className="w-5 h-5" />, label: 'Dashboard', id: 'dashboard' as View },
     { icon: <Hospital className="w-5 h-5" />, label: 'Hospitals', id: 'hospitals' as View },
     { icon: <Users className="w-5 h-5" />, label: 'User Roles', id: 'userRoles' as View },
-    { icon: <Navigation className="w-5 h-5" />, label: 'Routes', id: 'routes' },
     { icon: <Settings className="w-5 h-5" />, label: 'Settings', id: 'settings' as View },
     { icon: <Info className="w-5 h-5" />, label: 'About Us', id: 'about' },
   ];
@@ -563,7 +569,7 @@ const HospitalsView = ({ hospitals: dynamicHospitals }: { hospitals: HospitalDat
 };
 
 // --- Settings View ---
-const SettingsView = () => {
+const SettingsView = ({ user }: { user: User | null }) => {
   const [activeTab, setActiveTab] = useState('general');
 
   const tabs = [
@@ -611,14 +617,16 @@ const SettingsView = () => {
               <h4 className="text-sm font-bold text-white/30 uppercase tracking-widest mb-4">Account Profile</h4>
               <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-gold/20 flex items-center justify-center text-gold font-bold">SK</div>
+                  <div className="w-12 h-12 rounded-full bg-gold/20 flex items-center justify-center text-gold font-bold">
+                    {user?.initials || '??'}
+                  </div>
                   <div>
-                    <p className="font-bold">Shreyash Khaladkar</p>
-                    <p className="text-xs text-white/40">shreyashkhaladkar2@gmail.com</p>
+                    <p className="font-bold">{user?.name || 'Guest User'}</p>
+                    <p className="text-xs text-white/40">{user?.email || 'Please log in to see details'}</p>
                   </div>
                 </div>
                 <button className="px-4 py-2 glass rounded-xl text-xs font-bold hover:bg-white/5 transition-all flex items-center gap-2">
-                  Open <ExternalLink className="w-3 h-3" />
+                  Edit Profile <ExternalLink className="w-3 h-3" />
                 </button>
               </div>
             </section>
@@ -1378,10 +1386,92 @@ const ManualView = () => {
   );
 };
 
+// --- Login Modal Component ---
+const LoginModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: () => void, onLogin: (u: User) => void }) => {
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="glass w-[400px] rounded-[40px] p-10 border-gold/20 gold-glow relative"
+      >
+        <button onClick={onClose} className="absolute right-6 top-6 text-white/40 hover:text-white">
+          <ArrowLeft className="w-5 h-5 rotate-90" />
+        </button>
+
+        <h3 className="text-3xl font-display font-bold mb-2">{isSignUp ? 'Join Golden Root' : 'Welcome Back'}</h3>
+        <p className="text-sm text-white/40 mb-8 border-b border-white/10 pb-4">
+          {isSignUp ? 'Create an account to start dispatching' : 'Access your professional dashboard'}
+        </p>
+
+        <div className="space-y-4">
+          {isSignUp && (
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest pl-2">Full Name</label>
+              <input 
+                type="text" 
+                placeholder="John Doe"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-5 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-sm focus:outline-none focus:border-gold/30 transition-all font-medium"
+              />
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest pl-2">Email Address</label>
+            <input 
+              type="email" 
+              placeholder="john@example.com"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="w-full px-5 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-sm focus:outline-none focus:border-gold/30 transition-all font-medium"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-white/30 uppercase tracking-widest pl-2">Password</label>
+            <input 
+              type="password" 
+              placeholder="••••••••"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              className="w-full px-5 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-sm focus:outline-none focus:border-gold/30 transition-all font-medium"
+            />
+          </div>
+        </div>
+
+        <button 
+          onClick={() => {
+            const name = isSignUp ? formData.name : 'Dispatcher ' + formData.email.split('@')[0];
+            const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+            onLogin({ name, email: formData.email, initials });
+          }}
+          className="w-full py-4 bg-gold text-black font-black rounded-2xl mt-8 hover:scale-[1.02] transition-all shadow-[0_0_20px_rgba(255,215,0,0.2)]"
+        >
+          {isSignUp ? 'Create Account' : 'Sign In'}
+        </button>
+
+        <p className="text-center text-xs text-white/40 mt-6">
+          {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+          <button onClick={() => setIsSignUp(!isSignUp)} className="text-gold font-bold hover:underline">
+            {isSignUp ? 'Sign In' : 'Sign Up'}
+          </button>
+        </p>
+      </motion.div>
+    </div>
+  );
+};
+
 // --- Main Dashboard Layout ---
 export default function App() {
   const [view, setView] = useState<View>('landing');
   const [hospitals, setHospitals] = useState<HospitalData[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchHospitals = async () => {
@@ -1428,7 +1518,9 @@ export default function App() {
               <h1 className="text-3xl font-display font-bold mb-1 capitalize">
                 {view}
               </h1>
-              <p className="text-white/40 text-sm">Welcome back, Dispatcher Shreyash</p>
+              <p className="text-white/40 text-sm">
+                {currentUser ? `Welcome back, ${currentUser.name}` : 'Welcome to Golden Root Dispatch'}
+              </p>
             </div>
             
             <div className="flex items-center gap-4">
@@ -1444,9 +1536,25 @@ export default function App() {
                 <Bell className="w-5 h-5 text-white/60" />
                 <span className="absolute top-3 right-3 w-2 h-2 bg-gold rounded-full border-2 border-dark-bg" />
               </button>
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gold/20 to-gold/5 border border-gold/20 flex items-center justify-center text-gold font-bold cursor-pointer hover:scale-105 transition-transform" onClick={() => setView('settings')}>
-                SK
-              </div>
+              
+              {currentUser ? (
+                <div 
+                  className="h-12 px-2 flex items-center gap-3 glass rounded-2xl border border-gold/10 hover:border-gold/30 transition-all cursor-pointer group"
+                  onClick={() => setView('settings')}
+                >
+                  <div className="w-8 h-8 rounded-xl bg-gold/20 flex items-center justify-center text-gold font-bold text-xs">
+                    {currentUser.initials}
+                  </div>
+                  <span className="text-sm font-bold pr-2 group-hover:text-gold transition-colors">{currentUser.name.split(' ')[0]}</span>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="px-6 py-3 bg-gold text-black font-black rounded-2xl hover:scale-105 transition-transform shadow-[0_0_20px_rgba(255,215,0,0.2)] text-sm"
+                >
+                  Login / Sign Up
+                </button>
+              )}
             </div>
           </header>
         )}
@@ -1574,7 +1682,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <SettingsView />
+              <SettingsView user={currentUser} />
             </motion.div>
           )}
           {view === 'userRoles' && (
@@ -1603,6 +1711,17 @@ export default function App() {
       {/* Decorative Orbs */}
       <div className="fixed top-[-20%] right-[-10%] w-[50%] h-[50%] bg-gold/5 blur-[150px] rounded-full pointer-events-none" />
       <div className="fixed bottom-[-20%] left-[10%] w-[40%] h-[40%] bg-gold/5 blur-[150px] rounded-full pointer-events-none" />
+
+      <LoginModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+        onLogin={(u) => {
+          setCurrentUser(u);
+          setIsAuthModalOpen(false);
+          // Auto-navigate to settings to show details
+          setView('settings');
+        }}
+      />
     </div>
   );
 }
