@@ -38,7 +38,7 @@ import {
 import { useState, useEffect } from 'react';
 
 // --- Types ---
-type View = 'landing' | 'dashboard' | 'hospitals' | 'settings' | 'userRoles' | 'manual' | 'about';
+type View = 'landing' | 'hospitals' | 'settings' | 'userRoles' | 'manual' | 'about';
 
 interface Emergency {
   id: string;
@@ -94,7 +94,6 @@ interface HospitalData {
 const Sidebar = ({ currentView, setView }: { currentView: View, setView: (v: View) => void }) => {
   const menuItems = [
     { icon: <Home className="w-5 h-5" />, label: 'Home', id: 'landing' as View },
-    { icon: <Activity className="w-5 h-5" />, label: 'Dashboard', id: 'dashboard' as View },
     { icon: <Hospital className="w-5 h-5" />, label: 'Hospitals', id: 'hospitals' as View },
     { icon: <Users className="w-5 h-5" />, label: 'User Roles', id: 'userRoles' as View },
     { icon: <Settings className="w-5 h-5" />, label: 'Settings', id: 'settings' as View },
@@ -107,7 +106,7 @@ const Sidebar = ({ currentView, setView }: { currentView: View, setView: (v: Vie
         <div className="w-10 h-10 rounded-xl bg-gold flex items-center justify-center shadow-[0_0_20px_rgba(255,215,0,0.3)]">
           <Activity className="text-black w-6 h-6" />
         </div>
-        <span className="text-xl font-display font-bold tracking-tight text-gold">Golden Root</span>
+        <span className="text-xl font-display font-bold tracking-tight text-gold">GoldenHour Dispatch</span>
       </div>
 
       <div className="flex-1 flex flex-col gap-2">
@@ -116,7 +115,7 @@ const Sidebar = ({ currentView, setView }: { currentView: View, setView: (v: Vie
           <button 
             key={i} 
             onClick={() => {
-              if (item.id === 'landing' || item.id === 'dashboard' || item.id === 'hospitals' || item.id === 'settings' || item.id === 'userRoles' || item.id === 'about') {
+              if (item.id === 'landing' || item.id === 'hospitals' || item.id === 'settings' || item.id === 'userRoles' || item.id === 'about') {
                 setView(item.id as View);
               }
             }}
@@ -846,7 +845,7 @@ const AboutView = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
       <div className="glass p-10 rounded-[40px] border-gold/10 gold-glow">
         <p className="text-xl leading-relaxed text-white/80">
-          The Golden Root project was conceived to eliminate the critical delays in emergency triage that often cost lives. By seamlessly connecting vision-based accident classification with real-time hospital operational data, we've created a first-of-its-kind ecosystem where the right care is identified before the ambulance even reaches the scene.
+          The GoldenHour Dispatch project was conceived to eliminate the critical delays in emergency triage that often cost lives. By seamlessly connecting vision-based accident classification with real-time hospital operational data, we've created a first-of-its-kind ecosystem where the right care is identified before the ambulance even reaches the scene.
         </p>
       </div>
 
@@ -890,7 +889,7 @@ const Hero = ({ setView }: { setView: (v: View) => void }) => {
         transition={{ delay: 0.2 }}
         className="text-xl text-white/40 max-w-2xl mb-12 leading-relaxed"
       >
-        Golden Root uses advanced AI to detect accidents and route ambulances in real-time. 
+        GoldenHour Dispatch uses advanced AI to detect accidents and route ambulances in real-time. 
         Saving lives through precision and speed.
       </motion.p>
       <motion.div 
@@ -1533,7 +1532,7 @@ const LoginModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: ()
           <ArrowLeft className="w-5 h-5 rotate-90" />
         </button>
 
-        <h3 className="text-3xl font-display font-bold mb-2">{isSignUp ? 'Join Golden Root' : 'Welcome Back'}</h3>
+        <h3 className="text-3xl font-display font-bold mb-2">{isSignUp ? 'Join GoldenHour Dispatch' : 'Welcome Back'}</h3>
         <p className="text-sm text-white/40 mb-8 border-b border-white/10 pb-4">
           {isSignUp ? 'Create an account to start dispatching' : 'Access your professional dashboard'}
         </p>
@@ -1763,7 +1762,7 @@ export default function App() {
                       <div className="w-10 h-10 rounded-xl bg-gold flex items-center justify-center text-black shadow-[0_0_20px_rgba(255,215,0,0.3)]">
                         <Activity className="w-6 h-6" />
                       </div>
-                      <span className="text-2xl font-display font-bold text-gold tracking-tight">Golden Root</span>
+                      <span className="text-2xl font-display font-bold text-gold tracking-tight">GoldenHour Dispatch</span>
                     </div>
                     <p className="text-white/40 text-sm leading-relaxed italic">
                       "Arogyam Dhansampada" — Health is the true wealth. We are committed to preserving it through speed and technology.
@@ -1800,7 +1799,7 @@ export default function App() {
                 </div>
 
                 <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
-                  <p className="text-xs text-white/20">© 2026 Golden Root Emergency Systems. All rights reserved.</p>
+                  <p className="text-xs text-white/20">© 2026 GoldenHour Dispatch Emergency Systems. All rights reserved.</p>
                   <div className="flex gap-8 text-xs text-white/40">
                     <a href="#" className="hover:text-gold transition-colors">Privacy Policy</a>
                     <a href="#" className="hover:text-gold transition-colors">Terms of Service</a>
@@ -1808,25 +1807,6 @@ export default function App() {
                   </div>
                 </div>
               </footer>
-            </motion.div>
-          )}
-          {view === 'dashboard' && (
-            <motion.div 
-              key="dashboard"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-12 gap-8"
-            >
-              <div className="col-span-8 flex flex-col gap-8">
-                <div className="h-[400px]">
-                  <ActiveEmergencies emergencies={emergencies} />
-                </div>
-                <RecommendedHospital emergency={emergencies[0] || null} />
-              </div>
-              <div className="col-span-4 h-[600px]">
-                <MiniMapPreview activeEmergency={emergencies[0] || null} />
-              </div>
             </motion.div>
           )}
           {view === 'hospitals' && (
