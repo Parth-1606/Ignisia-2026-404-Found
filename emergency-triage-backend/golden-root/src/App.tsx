@@ -372,7 +372,7 @@ const MiniMapPreview = ({ activeEmergency }: { activeEmergency: Emergency | null
 };
 
 // --- Nearby Hospitals View ---
-const HospitalsView = ({ hospitals: displayHospitals, onRefresh }: { hospitals: HospitalData[], onRefresh: () => void }) => {
+const HospitalsView = ({ hospitals: displayHospitals, onRefresh, isRefreshing }: { hospitals: HospitalData[], onRefresh: () => void, isRefreshing: boolean }) => {
   const [sortBy, setSortBy] = useState<'distance' | 'beds' | 'waitTime'>('distance');
   const [isSortOpen, setIsSortOpen] = useState(false);
 
@@ -404,10 +404,11 @@ const HospitalsView = ({ hospitals: displayHospitals, onRefresh }: { hospitals: 
         <div className="flex items-center gap-4">
           <button 
             onClick={onRefresh}
-            className="px-6 py-3 glass rounded-2xl flex items-center gap-2 text-sm font-bold hover:bg-white/5 transition-all"
+            disabled={isRefreshing}
+            className={`px-6 py-3 glass rounded-2xl flex items-center gap-2 text-sm font-bold transition-all ${isRefreshing ? 'opacity-50 cursor-wait' : 'hover:bg-white/5'}`}
           >
-            <RotateCcw className="w-4 h-4" />
-            Refresh
+            <RotateCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Syncing...' : 'Refresh'}
           </button>
           
           <div className="relative">
@@ -1491,6 +1492,7 @@ export default function App() {
   const [emergencies, setEmergencies] = useState<Emergency[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications] = useState([
@@ -1500,6 +1502,7 @@ export default function App() {
   ]);
 
   const fetchDashboardData = async () => {
+    setIsRefreshing(true);
     try {
       // Fetch Hospitals
       const hRes = await fetch('http://localhost:3001/api/hospitals');
@@ -1697,7 +1700,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <HospitalsView hospitals={filteredHospitals} onRefresh={fetchDashboardData} />
+              <HospitalsView hospitals={filteredHospitals} onRefresh={fetchDashboardData} isRefreshing={isRefreshing} />
             </motion.div>
           )}
           {view === 'settings' && (
