@@ -129,15 +129,6 @@ const Sidebar = ({ currentView, setView }: { currentView: View, setView: (v: Vie
         ))}
       </div>
 
-      <div className="mt-auto p-4 glass rounded-2xl">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 rounded-full bg-gold/20 flex items-center justify-center text-gold">
-            <Star className="w-4 h-4" />
-          </div>
-          <p className="text-xs font-bold">Pro Dispatcher</p>
-        </div>
-        <p className="text-[10px] text-white/40">You are currently in high-priority mode.</p>
-      </div>
     </div>
   );
 };
@@ -682,32 +673,6 @@ const SettingsView = ({ user, onUpdateUser }: { user: User | null, onUpdateUser:
           </div>
         )}
 
-        {activeTab === 'account' && (
-          <div className="space-y-8">
-            <section>
-              <h4 className="text-sm font-bold text-white/30 uppercase tracking-widest mb-4">Current Plan</h4>
-              <div className="p-6 bg-gradient-to-br from-gold/20 to-transparent rounded-3xl border border-gold/20">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <p className="text-2xl font-bold text-gold">Pro Healthcare</p>
-                    <p className="text-sm text-white/60">Advanced emergency features enabled</p>
-                  </div>
-                  <div className="px-4 py-2 bg-gold text-black font-bold rounded-xl text-xs">ACTIVE</div>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-white/80">
-                    <CheckCircle2 className="w-4 h-4 text-gold" />
-                    Unlimited Ambulance Dispatches
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-white/80">
-                    <CheckCircle2 className="w-4 h-4 text-gold" />
-                    Priority AI Detection
-                  </div>
-                </div>
-              </div>
-            </section>
-          </div>
-        )}
       </div>
     </div>
   );
