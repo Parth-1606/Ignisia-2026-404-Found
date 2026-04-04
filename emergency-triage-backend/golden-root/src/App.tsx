@@ -432,7 +432,8 @@ const HospitalsView = ({ hospitals: dynamicHospitals }: { hospitals: HospitalDat
   ];
 
   const handleViewRoute = (h: HospitalData) => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lng}`;
+    // Ensuring the route starts from the user's current location with driving directions
+    const url = `https://www.google.com/maps/dir/?api=1&origin=My+Location&destination=${h.lat},${h.lng}&travelmode=driving`;
     window.open(url, '_blank');
   };
 
