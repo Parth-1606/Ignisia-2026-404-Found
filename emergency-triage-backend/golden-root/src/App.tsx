@@ -1581,49 +1581,6 @@ export default function App() {
             </div>
             
             <div className="flex items-center gap-4">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
-                <input 
-                  type="text" 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search hospitals..." 
-                  className="pl-12 pr-6 py-3 rounded-2xl glass focus:outline-none focus:border-gold/30 transition-all w-64 text-sm"
-                />
-              </div>
-              <div className="relative">
-                <button 
-                  onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                  className={`w-12 h-12 glass rounded-2xl flex items-center justify-center hover:bg-white/5 transition-all relative ${isNotificationsOpen ? 'bg-white/10 ring-1 ring-gold/30' : ''}`}
-                >
-                  <Bell className="w-5 h-5 text-white/60" />
-                  <span className="absolute top-3 right-3 w-2 h-2 bg-gold rounded-full border-2 border-dark-bg" />
-                </button>
-                
-                <AnimatePresence>
-                  {isNotificationsOpen && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute right-0 mt-3 w-80 glass rounded-3xl border border-white/10 shadow-2xl overflow-hidden z-50 py-2"
-                    >
-                      <div className="px-6 py-3 border-b border-white/5 bg-white/5">
-                        <p className="text-xs font-black uppercase tracking-widest text-gold">Live Notifications</p>
-                      </div>
-                      <div className="max-h-[300px] overflow-y-auto">
-                        {notifications.map(n => (
-                          <div key={n.id} className="px-6 py-4 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors">
-                            <p className="text-sm font-bold text-white/80">{n.title}</p>
-                            <p className="text-[10px] text-white/30 mt-1">{n.time}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-              
               {currentUser ? (
                 <div 
                   className="h-12 px-2 flex items-center gap-3 glass rounded-2xl border border-gold/10 hover:border-gold/30 transition-all cursor-pointer group"
