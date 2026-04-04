@@ -45,6 +45,10 @@ interface User {
   email: string;
   avatar?: string;
   initials?: string;
+  age: string;
+  bloodGroup: string;
+  syncLayouts: boolean;
+  showStatusBar: boolean;
 }
 
 interface HospitalData {
@@ -569,7 +573,7 @@ const HospitalsView = ({ hospitals: dynamicHospitals }: { hospitals: HospitalDat
 };
 
 // --- Settings View ---
-const SettingsView = ({ user }: { user: User | null }) => {
+const SettingsView = ({ user, onUpdateUser }: { user: User | null, onUpdateUser: (updates: Partial<User>) => void }) => {
   const [activeTab, setActiveTab] = useState('general');
 
   const tabs = [
@@ -634,13 +638,23 @@ const SettingsView = ({ user }: { user: User | null }) => {
             <section>
               <h4 className="text-sm font-bold text-white/30 uppercase tracking-widest mb-4">Personal Information</h4>
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                <div className="p-4 bg-white/5 rounded-2xl border border-white/5 group hover:border-gold/30 transition-all">
                   <p className="text-[10px] text-white/30 font-bold uppercase mb-1">Age</p>
-                  <p className="font-bold">24 Years</p>
+                  <input 
+                    type="text" 
+                    value={user?.age || '24 Years'} 
+                    onChange={(e) => onUpdateUser({ age: e.target.value })}
+                    className="bg-transparent font-bold text-white border-none focus:outline-none w-full" 
+                  />
                 </div>
-                <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                <div className="p-4 bg-white/5 rounded-2xl border border-white/5 group hover:border-gold/30 transition-all">
                   <p className="text-[10px] text-white/30 font-bold uppercase mb-1">Blood Group</p>
-                  <p className="font-bold text-red-400">O Positive</p>
+                  <input 
+                    type="text" 
+                    value={user?.bloodGroup || 'O Positive'} 
+                    onChange={(e) => onUpdateUser({ bloodGroup: e.target.value })}
+                    className="bg-transparent font-bold text-red-400 border-none focus:outline-none w-full" 
+                  />
                 </div>
               </div>
             </section>
@@ -653,8 +667,17 @@ const SettingsView = ({ user }: { user: User | null }) => {
                     <p className="font-bold text-sm">Sync layouts across windows</p>
                     <p className="text-xs text-white/40">When enabled, all windows share the same layout</p>
                   </div>
-                  <div className="w-10 h-5 bg-gold rounded-full relative cursor-pointer">
-                    <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full" />
+                  <div 
+                    onClick={() => onUpdateUser({ syncLayouts: !user?.syncLayouts })}
+                    className={`w-12 h-6 rounded-full relative cursor-pointer transition-colors ${
+                      user?.syncLayouts ? 'bg-gold' : 'bg-white/10'
+                    }`}
+                  >
+                    <motion.div 
+                      animate={{ x: user?.syncLayouts ? 24 : 4 }}
+                      initial={false}
+                      className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-lg" 
+                    />
                   </div>
                 </div>
                 <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
@@ -662,8 +685,17 @@ const SettingsView = ({ user }: { user: User | null }) => {
                     <p className="font-bold text-sm">Status Bar</p>
                     <p className="text-xs text-white/40">Show real-time status bar in dashboard</p>
                   </div>
-                  <div className="w-10 h-5 bg-gold rounded-full relative cursor-pointer">
-                    <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full" />
+                  <div 
+                    onClick={() => onUpdateUser({ showStatusBar: !user?.showStatusBar })}
+                    className={`w-12 h-6 rounded-full relative cursor-pointer transition-colors ${
+                      user?.showStatusBar ? 'bg-gold' : 'bg-white/10'
+                    }`}
+                  >
+                    <motion.div 
+                      animate={{ x: user?.showStatusBar ? 24 : 4 }}
+                      initial={false}
+                      className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-lg" 
+                    />
                   </div>
                 </div>
               </div>
@@ -1448,7 +1480,15 @@ const LoginModal = ({ isOpen, onClose, onLogin }: { isOpen: boolean, onClose: ()
           onClick={() => {
             const name = isSignUp ? formData.name : 'Dispatcher ' + formData.email.split('@')[0];
             const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-            onLogin({ name, email: formData.email, initials });
+            onLogin({ 
+              name, 
+              email: formData.email, 
+              initials,
+              age: '24 Years',
+              bloodGroup: 'O Positive',
+              syncLayouts: true,
+              showStatusBar: true
+            });
           }}
           className="w-full py-4 bg-gold text-black font-black rounded-2xl mt-8 hover:scale-[1.02] transition-all shadow-[0_0_20px_rgba(255,215,0,0.2)]"
         >
@@ -1682,7 +1722,10 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <SettingsView user={currentUser} />
+              <SettingsView 
+                user={currentUser} 
+                onUpdateUser={(updates) => currentUser && setCurrentUser({ ...currentUser, ...updates })}
+              />
             </motion.div>
           )}
           {view === 'userRoles' && (
